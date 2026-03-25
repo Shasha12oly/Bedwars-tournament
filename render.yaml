@@ -1,15 +1,20 @@
 services:
-  # Web Service (for database functionality)
+  # Web Service for Node.js application
   - type: web
     name: bedwars-tournament
     runtime: node
     env: node
-    buildCommand: npm install; npm run build
+    buildCommand: npm install && npm run build
     startCommand: npm start
     nodeVersion: 18
+    plan: free
+    region: oregon
     envVars:
       - key: NODE_ENV
         value: production
+      - key: PORT
+        value: 10000
+    healthCheckPath: /
     headers:
       - path: /*
         name: X-Frame-Options
@@ -20,6 +25,3 @@ services:
       - path: /*
         name: Referrer-Policy
         value: strict-origin-when-cross-origin
-      - path: /*
-        name: Permissions-Policy
-        value: camera=(), microphone=(), geolocation=()
