@@ -2,8 +2,9 @@ services:
   # Static Site Service
   - type: web
     name: bedwars-tournament
+    runtime: node
     env: static
-    buildCommand: npm run build
+    buildCommand: bash render-build.sh
     publishDirectory: out
     nodeVersion: 18
     envVars:
