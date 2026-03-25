@@ -1,11 +1,11 @@
 services:
-  # Static Site Service
+  # Web Service (for database functionality)
   - type: web
     name: bedwars-tournament
     runtime: node
-    env: static
-    buildCommand: bash render-build.sh
-    publishDirectory: out
+    env: node
+    buildCommand: npm install; npm run build
+    startCommand: npm start
     nodeVersion: 18
     envVars:
       - key: NODE_ENV
