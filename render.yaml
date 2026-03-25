@@ -1,0 +1,24 @@
+services:
+  # Static Site Service
+  - type: web
+    name: bedwars-tournament
+    env: static
+    buildCommand: npm run build
+    publishDirectory: out
+    nodeVersion: 18
+    envVars:
+      - key: NODE_ENV
+        value: production
+    headers:
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
+      - path: /*
+        name: Permissions-Policy
+        value: camera=(), microphone=(), geolocation=()
