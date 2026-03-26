@@ -4,6 +4,48 @@ import { mentionForUsernameInGuild } from '@/lib/discord-mentions';
 // Discord Gateway connection for "online" status
 let gatewayWs: WebSocket | null = null;
 let heartbeatInterval: NodeJS.Timeout | null = null;
+let isGatewayInitialized = false;
+
+// Auto-connect gateway on module load
+let gatewayInitialized = false;
+
+// Auto-initialize gateway immediately when module loads
+(async () => {
+  const botToken = process.env.DISCORD_BOT_TOKEN;
+  if (botToken && !gatewayInitialized) {
+    gatewayInitialized = true;
+    console.log('� Module loaded - Auto-initializing Discord Gateway connection...');
+    await connectGateway(botToken);
+    
+    // Start heartbeat after connection is established
+    setTimeout(() => {
+      if (gatewayWs && gatewayWs.readyState === WebSocket.OPEN) {
+        console.log('💓 Starting continuous heartbeat system...');
+        startHeartbeat();
+      }
+    }, 5000); // Start heartbeat 5 seconds after connection
+  }
+})();
+
+// Start heartbeat interval
+function startHeartbeat() {
+  if (heartbeatInterval) {
+    clearInterval(heartbeatInterval); // Clear existing interval
+  }
+  
+  // Only start if gateway is connected
+  if (gatewayWs && gatewayWs.readyState === WebSocket.OPEN) {
+    console.log('💓 Starting continuous heartbeat system...');
+    heartbeatInterval = setInterval(() => {
+      if (gatewayWs && gatewayWs.readyState === WebSocket.OPEN) {
+        gatewayWs.send(JSON.stringify({ op: 1, d: null })); // Heartbeat
+        console.log('💓 Heartbeat sent to Discord Gateway');
+      }
+    }, 30000); // 30 seconds
+  } else {
+    console.log('❌ Cannot start heartbeat - Gateway not connected');
+  }
+}
 
 async function connectGateway(token: string) {
   if (gatewayWs && gatewayWs.readyState === WebSocket.OPEN) {
@@ -35,26 +77,35 @@ async function connectGateway(token: string) {
     gatewayWs.onopen = () => {
       console.log('✅ Connected to Discord Gateway - Bot will appear online');
       
-      // Identify with minimal intents
-      gatewayWs!.send(JSON.stringify({
-        op: 2, // Identify
-        d: {
-          token: token,
-          intents: 1, // GUILDS only (minimal)
-          properties: {
-            os: 'linux',
-            browser: 'bedwars-tournament-bot',
-            device: 'bedwars-tournament'
-          }
-        }
-      }));
-      
-      // Start heartbeat
-      heartbeatInterval = setInterval(() => {
+      // Wait for WebSocket to be fully ready before sending
+      setTimeout(() => {
         if (gatewayWs && gatewayWs.readyState === WebSocket.OPEN) {
-          gatewayWs.send(JSON.stringify({ op: 1, d: null })); // Heartbeat
+          console.log('📤 Sending identify packet to Discord...');
+          // Identify with minimal intents
+          gatewayWs.send(JSON.stringify({
+            op: 2, // Identify
+            d: {
+              token: token,
+              intents: 1, // GUILDS only (minimal)
+              properties: {
+                os: 'linux',
+                browser: 'bedwars-tournament-bot',
+                device: 'bedwars-tournament'
+              }
+            }
+          }));
+          
+          // Start heartbeat after identify is sent and acknowledged
+          setTimeout(() => {
+            if (gatewayWs && gatewayWs.readyState === WebSocket.OPEN) {
+              console.log('💓 Starting continuous heartbeat system...');
+              startHeartbeat();
+            }
+          }, 2000); // Wait 2 seconds for identify to be processed
+        } else {
+          console.log('❌ WebSocket not ready for identify');
         }
-      }, 30000); // 30 seconds
+      }, 1000); // Wait 1 second for connection to stabilize
     };
 
     gatewayWs.onmessage = (event) => {
@@ -87,14 +138,14 @@ async function connectGateway(token: string) {
   }
 }
 
-// Initialize gateway connection on first API call
-let gatewayInitialized = false;
-
 export async function POST(req: Request) {
   try {
+    // Gateway auto-initializes when module loads, no need to call here
     const botToken = process.env.DISCORD_BOT_TOKEN;
     const channelId = process.env.DISCORD_CHANNEL_ID;
     const guildId = process.env.DISCORD_GUILD_ID;
+
+    console.log('📝 Team registration request received - initializing Discord connection...');
 
     if (!botToken) {
       return NextResponse.json({ ok: false, error: 'Missing DISCORD_BOT_TOKEN' }, { status: 500 });
@@ -198,6 +249,14 @@ export async function POST(req: Request) {
     // Add beautiful content with pings
     const content = `🎮 **New Team Registration!** 🎉\n\n${pingMentions.join(' ')} - Your team **${team.name}** has been successfully registered for **${tournament.name}**! 🏆`;
 
+    console.log('📝 Sending Discord message with data:', {
+      content: content.substring(0, 200),
+      embed: embed,
+      allowedUserIds,
+      channelId,
+      botToken: botToken ? `${botToken.substring(0, 10)}...` : 'MISSING'
+    });
+
     const discordRes = await fetch(`https://discord.com/api/v10/channels/${channelId}/messages`, {
       method: 'POST',
       headers: {
@@ -213,9 +272,15 @@ export async function POST(req: Request) {
       }),
     });
 
+    console.log('📊 Discord API Response:', {
+      status: discordRes.status,
+      statusText: discordRes.statusText,
+      ok: discordRes.ok
+    });
+
     if (!discordRes.ok) {
       const errorText = await discordRes.text();
-      console.error('Discord API Error:', {
+      console.error('❌ Discord API Error Details:', {
         status: discordRes.status,
         statusText: discordRes.statusText,
         errorText: errorText,
@@ -229,7 +294,8 @@ export async function POST(req: Request) {
       );
     }
 
-    return NextResponse.json({ ok: true });
+    console.log('✅ Discord message sent successfully!');
+    return NextResponse.json({ ok: true, messageId: 'sent', details: 'Team registration message sent to Discord' });
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : 'Unknown error';
     return NextResponse.json({ ok: false, error: message }, { status: 500 });

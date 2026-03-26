@@ -12,8 +12,30 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
-      - key: PORT
-        value: 10000
+      - key: DISCORD_BOT_TOKEN
+        sync: false
+        generateValue: ""
+        description: "Discord bot token for team registration notifications"
+      - key: DISCORD_CHANNEL_ID
+        sync: false
+        generateValue: ""
+        description: "Discord channel ID for team registration messages"
+      - key: DISCORD_GUILD_ID
+        sync: false
+        generateValue: ""
+        description: "Discord server/guild ID for bot operations"
+      - key: DISCORD_RULES_CHANNEL_ID
+        sync: false
+        generateValue: ""
+        description: "Discord channel ID for rules announcements"
+      - key: DISCORD_PING_EVERYONE
+        sync: false
+        generateValue: "true"
+        description: "Whether to ping @everyone in announcements"
+      - key: DISCORD_HOST_ROLE_ID
+        sync: false
+        generateValue: ""
+        description: "Discord role ID for tournament host permissions"
     healthCheckPath: /
     headers:
       - path: /*
