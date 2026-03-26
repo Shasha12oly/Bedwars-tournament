@@ -5,37 +5,39 @@ import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import BottomNav from '@/components/BottomNav';
-import { getTournament, getTeams, getTeamCount } from '@/lib/database';
+import TournamentBracket from '@/components/TournamentBracket';
+import { getTournamentsFromDatabase, getTeamsFromDatabase, getTeamCountFromDatabase } from '@/lib/tournament-storage';
 
 interface Tournament {
   id: string;
   name: string;
-  format: 'Solo' | 'Duo' | 'rbw 4v4';
+  format: string;
   date: string;
   time: string;
-  slots: number;
+  max_slots: number;
   registered: number;
-  status: 'open' | 'closed' | 'ongoing';
-  prize: string;
-  description: string;
+  status: string;
+  prize_pool: string;
   rules: string[];
   schedule: { time: string; event: string }[];
+  created_at: string;
+  updated_at: string;
 }
 
 export default function TournamentDetails({ params, searchParams }: { 
   params: Promise<{ id: string }>; 
-  searchParams: Promise<{ registered?: string }>;
+  searchParams: Promise<{ registered?: string; autoClosed?: string; bracketGenerated?: string }>;
 }) {
   const resolvedParams = use(params);
   const resolvedSearchParams = use(searchParams);
-  
-  console.log('TournamentDetails component rendered with params:', resolvedParams);
-  
-  const [activeTab, setActiveTab] = useState<'overview' | 'rules' | 'schedule' | 'bracket' | 'teams'>('overview');
   const [tournament, setTournament] = useState<any>(null);
   const [teams, setTeams] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const isRegistered = resolvedSearchParams.registered === 'true';
+  const [activeTab, setActiveTab] = useState('overview');
+  const [isRegistered, setIsRegistered] = useState(false);
+  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+  const [showAutoClosedMessage, setShowAutoClosedMessage] = useState(false);
+  const [showBracketGeneratedMessage, setShowBracketGeneratedMessage] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
@@ -54,11 +56,10 @@ export default function TournamentDetails({ params, searchParams }: {
         const allTournaments = await tournamentsResponse.json();
         
         const tournamentData = allTournaments.find((t: any) => t.id === tournamentId);
-        const teamsData = allTeams.filter((team: any) => team.tournamentId === tournamentId);
-        const teamCount = teamsData.length;
+        const teamsData = allTeams.filter((team: any) => team.tournament_id === tournamentId);
+        const teamCount = tournamentData?.currentTeams || teamsData.length;
         
-        console.log('Tournament data:', tournamentData);
-        console.log('Teams data:', teamsData, 'Count:', teamCount);
+        console.log('Tournament data loaded:', tournamentData.name, 'Teams:', teamCount);
         
         if (!tournamentData) {
           console.log('Tournament not found in database');
@@ -66,13 +67,38 @@ export default function TournamentDetails({ params, searchParams }: {
           return;
         }
         
-        setTournament({
+        // Parse JSON fields from database
+        const parsedTournament = {
           ...tournamentData,
           registered: teamCount,
-          slots: tournamentData.maxSlots,
-          status: teamCount >= tournamentData.maxSlots ? 'closed' : tournamentData.status
-        });
+          slots: tournamentData.max_slots,  // Fix: use max_slots from database
+          status: teamCount >= tournamentData.max_slots ? 'closed' : tournamentData.status,
+          rules: typeof tournamentData.rules === 'string' ? JSON.parse(tournamentData.rules) : tournamentData.rules,
+          schedule: typeof tournamentData.schedule === 'string' ? JSON.parse(tournamentData.schedule) : tournamentData.schedule
+        };
+        
+                
+        setTournament(parsedTournament);
         setTeams(teamsData);
+        
+        // Check if user just registered
+        if (resolvedSearchParams.registered === 'true') {
+          setShowSuccessMessage(true);
+          // Check if registration was auto-closed
+          if (resolvedSearchParams.autoClosed === 'true') {
+            setShowAutoClosedMessage(true);
+            // Check if bracket was also generated
+            if (resolvedSearchParams.bracketGenerated === 'true') {
+              setShowBracketGeneratedMessage(true);
+              // Hide bracket generated message after 10 seconds (longest for special message)
+              setTimeout(() => setShowBracketGeneratedMessage(false), 10000);
+            }
+            // Hide auto-closed message after 8 seconds (longer for special message)
+            setTimeout(() => setShowAutoClosedMessage(false), 8000);
+          }
+          // Hide success message after 5 seconds
+          setTimeout(() => setShowSuccessMessage(false), 5000);
+        }
       } catch (error) {
         console.error('Error loading tournament data:', error);
       } finally {
@@ -141,13 +167,38 @@ export default function TournamentDetails({ params, searchParams }: {
         <div className="relative mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-12 md:px-8">
           
           {/* Success Message */}
-          {isRegistered && (
-            <div className="mb-6 p-4 bg-emerald-500/20 border border-emerald-500/30 rounded-lg">
+          {showSuccessMessage && (
+            <div className="mb-6 p-4 bg-emerald-500/20 border border-emerald-500/30 rounded-lg animate-pulse">
               <div className="flex items-center gap-3">
-                <span className="text-emerald-400 text-xl">✓</span>
+                <span className="text-emerald-400 text-xl">🎉</span>
                 <div>
                   <h3 className="text-emerald-400 font-medium">Registration Successful!</h3>
-                  <p className="text-slate-300 text-sm">You're registered for {tournament.name}. Check your email for confirmation.</p>
+                  <p className="text-slate-300 text-sm">Your team has been registered for {tournament.name}. Check the Teams tab to see your registration!</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Auto-Closure Message */}
+          {showAutoClosedMessage && (
+            <div className="mb-6 p-4 bg-amber-500/20 border border-amber-500/30 rounded-lg animate-pulse">
+              <div className="flex items-center gap-3">
+                <span className="text-amber-400 text-xl">🏁</span>
+                <div>
+                  <h3 className="text-amber-400 font-medium">Tournament Now Full!</h3>
+                  <p className="text-slate-300 text-sm">Registration has automatically closed since all slots are filled. Tournament organizers can now generate the bracket!</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Bracket Generated Message */}
+          {showBracketGeneratedMessage && (
+            <div className="mb-6 p-6 bg-gradient-to-r from-emerald-500/20 to-blue-500/20 border border-emerald-500/30 rounded-xl animate-pulse">
+              <div className="flex items-center gap-3">
+                <div className="mt-6 p-4 bg-emerald-500/10 rounded-lg border border-emerald-500/30">
+                  <h3 className="text-emerald-400 font-bold text-lg">Tournament Bracket Ready!</h3>
+                  <p className="text-slate-300 text-sm">The tournament bracket has been automatically generated! View the complete bracket in the Bracket tab above.</p>
                 </div>
               </div>
             </div>
@@ -214,10 +265,10 @@ export default function TournamentDetails({ params, searchParams }: {
                 <div className="text-sm text-slate-400 uppercase tracking-wider font-semibold">Prize Pool</div>
               </div>
               <div className="space-y-2">
-                {tournament.prizePool ? tournament.prizePool.split('\n').map((prize: string, index: number) => (
-                  <div key={index} className="flex items-start gap-2">
-                    <span className="text-emerald-400 text-sm mt-0.5">✦</span>
-                    <span className="text-white text-sm leading-relaxed">{prize.trim()}</span>
+                {tournament.prize_pool ? tournament.prize_pool.split('\n').map((prize: string, index: number) => (
+                  <div key={index} className="flex items-start gap-2 p-2 bg-gradient-to-r from-amber-500/10 to-yellow-500/10 rounded-lg border border-amber-500/20">
+                    <span className="text-yellow-400 text-lg">{prize.trim().split(' ')[0]}</span>
+                    <span className="text-white text-sm leading-relaxed font-medium">{prize.trim().split(' ').slice(1).join(' ')}</span>
                   </div>
                 )) : (
                   <div className="text-slate-400 text-sm">No prize information</div>
@@ -264,9 +315,10 @@ export default function TournamentDetails({ params, searchParams }: {
           <section className="card-glass p-6">
             {activeTab === 'overview' && (
               <div>
-                <h2 className="text-2xl font-bold text-white mb-4">Tournament Overview</h2>
-                <p className="text-slate-300 leading-relaxed mb-6">{tournament.description}</p>
-                
+                <div className="mb-8">
+                  <h1 className="text-3xl font-bold text-white mb-2">{tournament.name}</h1>
+                  <p className="text-slate-400">{tournament.description}</p>
+                </div>  
                 <h3 className="text-xl font-semibold text-white mb-3">How to Participate</h3>
                 <ol className="space-y-2 text-slate-300">
                   <li className="flex gap-3">
@@ -293,12 +345,16 @@ export default function TournamentDetails({ params, searchParams }: {
               <div>
                 <h2 className="text-2xl font-bold text-white mb-4">Tournament Rules</h2>
                 <div className="space-y-3">
-                  {tournament.rules?.map((rule: string, index: number) => (
-                    <div key={index} className="flex items-start gap-3 p-3 bg-white/5 rounded-lg">
-                      <span className="text-emerald-400 mt-0.5">•</span>
-                      <span className="text-slate-300">{rule}</span>
-                    </div>
-                  ))}
+                  {tournament.rules && Array.isArray(tournament.rules) ? (
+                    tournament.rules.map((rule: string, index: number) => (
+                      <div key={index} className="flex items-start gap-3 p-3 bg-white/5 rounded-lg">
+                        <span className="text-emerald-400 mt-0.5">•</span>
+                        <span className="text-slate-300">{rule}</span>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-slate-400">No rules available</div>
+                  )}
                 </div>
                 <div className="mt-6 p-4 bg-amber-500/20 border border-amber-500/30 rounded-lg">
                   <h3 className="text-amber-400 font-semibold mb-2">⚠️ Important</h3>
@@ -321,12 +377,16 @@ export default function TournamentDetails({ params, searchParams }: {
                   </p>
                 </div>
                 <div className="space-y-3">
-                  {tournament.schedule?.map((item: { time: string; event: string }, index: number) => (
-                    <div key={index} className="flex items-center gap-4 p-3 bg-white/5 rounded-lg">
-                      <div className="text-emerald-400 font-medium min-w-[80px]">{item.time}</div>
-                      <div className="text-slate-300">{item.event}</div>
-                    </div>
-                  ))}
+                  {tournament.schedule && Array.isArray(tournament.schedule) ? (
+                    tournament.schedule.map((item: { time: string; event: string }, index: number) => (
+                      <div key={index} className="flex items-center gap-4 p-3 bg-white/5 rounded-lg">
+                        <div className="text-emerald-400 font-medium min-w-[120px]">{item.time}</div>
+                        <div className="text-slate-300">{item.event}</div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-slate-400">No schedule available</div>
+                  )}
                 </div>
                 <div className="mt-6 p-4 bg-blue-500/20 border border-blue-500/30 rounded-lg">
                   <h3 className="text-blue-400 font-semibold mb-2">ℹ️ Time Zone</h3>
@@ -376,7 +436,7 @@ export default function TournamentDetails({ params, searchParams }: {
                         <div className="flex items-center gap-2">
                           <span className="text-slate-400">Registered:</span>
                           <span className="text-slate-300">
-                            {new Date(team.registeredAt).toLocaleDateString()}
+                            {team.registered_at ? new Date(team.registered_at).toLocaleDateString() : 'Unknown'}
                           </span>
                         </div>
                       </div>
@@ -406,22 +466,7 @@ export default function TournamentDetails({ params, searchParams }: {
           )}
 
           {activeTab === 'bracket' && (
-              <div>
-                <h2 className="text-2xl font-bold text-white mb-4">Tournament Bracket</h2>
-                <div className="text-center py-12">
-                  <span className="text-4xl mb-4 block">🏆</span>
-                  <h3 className="text-xl font-semibold text-white mb-2">Live Tournament Bracket</h3>
-                  <p className="text-slate-400 mb-4">
-                    View the complete tournament bracket with all rounds and matchups.
-                  </p>
-                  <Link 
-                    href={`/tournaments/${resolvedParams.id}/rounds`}
-                    className="btn-gradient inline-flex min-h-[44px] items-center justify-center px-6 py-3"
-                  >
-                    View Full Bracket
-                  </Link>
-                </div>
-              </div>
+              <TournamentBracket tournamentId={resolvedParams.id} tournamentStatus={tournament?.status} />
             )}
           </section>
         </div>

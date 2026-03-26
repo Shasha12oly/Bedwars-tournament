@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { mentionForUsernameInGuild } from '@/lib/discord-mentions';
-import { getTeamCountFromFile } from '@/lib/file-storage';
+import { getTeamCountFromDatabase } from '@/lib/tournament-storage';
 
 // Discord Gateway connection for "online" status
 let gatewayWs: WebSocket | null = null;
@@ -248,7 +248,7 @@ export async function POST(req: Request) {
     }).join('\n');
 
     // Get current team count for registration progress (this is the new team being registered)
-    const currentTeams = await getTeamCountFromFile(tournament.id);
+    const currentTeams = await getTeamCountFromDatabase(tournament.id);
     const maxSlots = tournament.maxSlots || 16; // Default to 16 if not specified
     
     const embed = {

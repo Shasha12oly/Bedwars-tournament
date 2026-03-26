@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getTeamsFromFile, saveTeamsToFile } from '@/lib/persistent-storage';
+import { deleteTeamFromDatabase } from '@/lib/tournament-storage';
 
 export async function DELETE(
   request: Request,
@@ -12,17 +12,11 @@ export async function DELETE(
       return NextResponse.json({ error: 'Team ID is required' }, { status: 400 });
     }
 
-    // Get existing teams
-    const teams = await getTeamsFromFile();
+    // Delete team from database
+    const deleted = await deleteTeamFromDatabase(teamId);
     
-    // Filter out the team to delete
-    const updatedTeams = teams.filter((team: any) => team.id !== teamId);
-    
-    // Save updated teams
-    const saved = await saveTeamsToFile(updatedTeams);
-    
-    if (!saved) {
-      return NextResponse.json({ error: 'Failed to delete team' }, { status: 500 });
+    if (!deleted) {
+      return NextResponse.json({ error: 'Failed to delete team or team not found' }, { status: 500 });
     }
 
     return NextResponse.json({ 

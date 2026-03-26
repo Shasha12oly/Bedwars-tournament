@@ -13,9 +13,9 @@ interface Tournament {
   time: string;
   status: string;
   format: string;
-  maxSlots: number;
+  max_slots: number;
   currentTeams: number;
-  prizePool: string;
+  prize_pool: string;
   rules: string[];
   schedule: { time: string; event: string }[];
   winner?: string;
@@ -26,6 +26,7 @@ const getFormatIcon = (format: string) => {
     case 'Solo': return '⚔️';
     case 'Duo': return '👥';
     case 'rbw 4v4': return '🛡️';
+    case 'Rankedbedwars 4v4': return '🎮';
     default: return '🎮';
   }
 };
@@ -48,13 +49,32 @@ export default function TournamentsPage() {
   const loadTournaments = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/tournaments');
-      const data = await response.json();
+      const [tournamentsResponse, teamsResponse] = await Promise.all([
+        fetch('/api/tournaments'),
+        fetch('/api/teams')
+      ]);
       
-      if (response.ok) {
-        setTournaments(data);
+      const tournamentsData = await tournamentsResponse.json();
+      const teamsData = await teamsResponse.json();
+      
+      if (tournamentsResponse.ok) {
+        // Map database fields to interface and use currentTeams from API
+        const mappedTournaments = tournamentsData.map((tournament: any) => {
+          // Use the currentTeams from the tournament API (already calculated)
+          const currentTeams = tournament.currentTeams || teamsData.filter((team: any) => team.tournament_id === tournament.id).length;
+          
+          return {
+            ...tournament,
+            currentTeams: currentTeams,
+            // Parse JSON fields if needed
+            rules: typeof tournament.rules === 'string' ? JSON.parse(tournament.rules) : tournament.rules,
+            schedule: typeof tournament.schedule === 'string' ? JSON.parse(tournament.schedule) : tournament.schedule
+          };
+        });
+        
+        setTournaments(mappedTournaments);
       } else {
-        console.error('Failed to load tournaments:', data);
+        console.error('Failed to load tournaments:', tournamentsData);
       }
     } catch (error) {
       console.error('Error loading tournaments:', error);
@@ -157,11 +177,24 @@ export default function TournamentsPage() {
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-slate-400">Slots</span>
-                    <span className="text-white font-medium">{tournament.currentTeams}/{tournament.maxSlots}</span>
+                    <span className="text-white font-medium">{tournament.currentTeams}/{tournament.max_slots}</span>
                   </div>
-                  <div className="flex items-center justify-between text-sm">
+                  <div className="flex items-start justify-between text-sm">
                     <span className="text-slate-400">Prizes</span>
-                    <span className="text-emerald-400 font-bold text-right text-xs max-w-[150px] whitespace-pre-line">{tournament.prizePool}</span>
+                    <div className="text-right max-w-[180px]">
+                      <div className="space-y-1">
+                        {tournament.prize_pool.split('\n').map((prize: string, index: number) => (
+                          <div key={index} className="bg-gradient-to-r from-amber-500/10 to-yellow-500/10 rounded px-2 py-1 border border-amber-500/20">
+                            <div className="flex items-center justify-end gap-1">
+                              <span className="text-xs text-yellow-300 font-medium leading-tight">
+                                {prize.trim().split(' ').slice(1).join(' ')}
+                              </span>
+                              <span className="text-sm">{prize.trim().split(' ')[0]}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -177,7 +210,7 @@ export default function TournamentsPage() {
                   <span className="text-emerald-400 text-sm font-medium">
                     {tournament.status === 'completed' ? 'View Results' : 
                      tournament.status === 'live' ? 'Watch Live' : 
-                     tournament.currentTeams >= tournament.maxSlots ? 'Tournament Full' : 'Register Now'}
+                     tournament.status === 'closed' || tournament.currentTeams >= tournament.max_slots ? 'Registration Closed' : 'Join Now'}
                   </span>
                   <div className="text-emerald-400 group-hover:translate-x-1 transition-transform">
                     →

@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
-import { saveTeamsToFile } from '@/lib/file-storage';
+import { getTeamsFromDatabase, deleteTeamFromDatabase } from '@/lib/tournament-storage';
 
 export async function POST() {
   try {
-    // Clear all teams by saving empty array
-    const saved = await saveTeamsToFile([]);
+    // Get all teams and delete them one by one
+    const teams = await getTeamsFromDatabase();
     
-    if (!saved) {
-      return NextResponse.json({ error: 'Failed to reset teams' }, { status: 500 });
+    for (const team of teams) {
+      await deleteTeamFromDatabase(team.id);
     }
 
     return NextResponse.json({ 
