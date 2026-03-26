@@ -32,6 +32,10 @@ services:
         sync: false
         generateValue: "true"
         description: "Whether to ping @everyone in announcements"
+      - key: DISCORD_STORAGE_CHANNEL_ID
+        sync: false
+        generateValue: ""
+        description: "Discord channel ID for JSON data storage messages"
       - key: DISCORD_HOST_ROLE_ID
         sync: false
         generateValue: ""
