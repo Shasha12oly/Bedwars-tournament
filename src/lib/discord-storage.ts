@@ -115,7 +115,9 @@ export async function writeToDiscord(messageIdentifier: string, data: any[]): Pr
     const messages: DiscordMessage[] = await getResponse.json();
     
     // Format message content with JSON data
-    const messageContent = `**${messageIdentifier}**\n```json\n${JSON.stringify(data, null, 2)}\n```\n*Last updated: ${new Date().toISOString()}*`;
+    const jsonData = JSON.stringify(data, null, 2);
+    const timestamp = new Date().toISOString();
+    const messageContent = `**${messageIdentifier}**\n\`\`\`json\n${jsonData}\n\`\`\`\n*Last updated: ${timestamp}*`;
     
     const existingMessage = messages.find(msg => 
       msg.content.startsWith(`**${messageIdentifier}**`)
