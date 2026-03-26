@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
-import { generateTournamentBracket } from '@/lib/match-database';
+import { generateTournamentBracket } from '@/lib/matches-storage';
 
 export async function POST(request: Request) {
   try {
-    const { tournamentId } = await request.json();
+    const { tournamentId, tournamentName } = await request.json();
 
     // Generate new bracket (this automatically clears existing matches)
-    const matches = await generateTournamentBracket(tournamentId || '1');
+    const matches = await generateTournamentBracket(tournamentId || '1', tournamentName || 'Tournament');
 
     return NextResponse.json({
       message: 'Tournament bracket created successfully',
