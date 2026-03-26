@@ -7,6 +7,12 @@ const nextConfig = {
     }
     return config;
   },
+  // Force webpack instead of turbopack for compatibility
+  experimental: {
+    turbo: {
+      resolveExtension: ['.tsx', '.ts', '.jsx', '.js', '.mjs'],
+    },
+  },
 };
 
 export default nextConfig;
