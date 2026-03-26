@@ -40,24 +40,31 @@ export default function TournamentDetails({ params, searchParams }: {
   useEffect(() => {
     const loadData = async () => {
       try {
-        console.log('Loading tournament details for ID:', resolvedParams.id);
+        setLoading(true);
         const tournamentId = resolvedParams.id;
+        console.log('Loading tournament details for ID:', tournamentId);
         
-        // Get specific tournament from database
-        const tournamentData = await getTournament(tournamentId);
-        console.log('Tournament data from database:', tournamentData);
+        // Get teams data from server API
+        const [teamsResponse, tournamentsResponse] = await Promise.all([
+          fetch('/api/teams'),
+          fetch('/api/tournaments')
+        ]);
+        
+        const allTeams = await teamsResponse.json();
+        const allTournaments = await tournamentsResponse.json();
+        
+        const tournamentData = allTournaments.find((t: any) => t.id === tournamentId);
+        const teamsData = allTeams.filter((team: any) => team.tournamentId === tournamentId);
+        const teamCount = teamsData.length;
+        
+        console.log('Tournament data:', tournamentData);
+        console.log('Teams data:', teamsData, 'Count:', teamCount);
         
         if (!tournamentData) {
           console.log('Tournament not found in database');
           setLoading(false);
           return;
         }
-        
-        // Get teams data from database
-        const teamsData = await getTeams(tournamentId);
-        const teamCount = await getTeamCount(tournamentId);
-        console.log('Teams data:', teamsData, 'Count:', teamCount);
-        console.log('localStorage teams:', localStorage.getItem(`tournament_teams_${tournamentId}`));
         
         setTournament({
           ...tournamentData,
@@ -74,7 +81,7 @@ export default function TournamentDetails({ params, searchParams }: {
     };
 
     loadData();
-  }, [resolvedParams.id]);
+  }, [resolvedParams.id]); // Add dependency array to prevent infinite loops
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -166,7 +173,7 @@ export default function TournamentDetails({ params, searchParams }: {
                 </div>
               </div>
               <div className="flex gap-3">
-                {tournament.status === 'open' && !isRegistered && tournament.registered < tournament.slots && (
+                {(tournament.status === 'open' || tournament.status === 'upcoming') && !isRegistered && tournament.registered < tournament.slots && (
                   <Link 
                     href={`/tournaments/${resolvedParams.id}/register`}
                     className="btn-gradient px-6 py-3 rounded-lg font-medium"
@@ -207,12 +214,14 @@ export default function TournamentDetails({ params, searchParams }: {
                 <div className="text-sm text-slate-400 uppercase tracking-wider font-semibold">Prize Pool</div>
               </div>
               <div className="space-y-2">
-                {tournament.prize.split('|').map((prize: string, index: number) => (
+                {tournament.prizePool ? tournament.prizePool.split('\n').map((prize: string, index: number) => (
                   <div key={index} className="flex items-start gap-2">
                     <span className="text-emerald-400 text-sm mt-0.5">✦</span>
                     <span className="text-white text-sm leading-relaxed">{prize.trim()}</span>
                   </div>
-                ))}
+                )) : (
+                  <div className="text-slate-400 text-sm">No prize information</div>
+                )}
               </div>
             </div>
             <div className="card-glass p-4">
@@ -284,7 +293,7 @@ export default function TournamentDetails({ params, searchParams }: {
               <div>
                 <h2 className="text-2xl font-bold text-white mb-4">Tournament Rules</h2>
                 <div className="space-y-3">
-                  {tournament.rules.map((rule: string, index: number) => (
+                  {tournament.rules?.map((rule: string, index: number) => (
                     <div key={index} className="flex items-start gap-3 p-3 bg-white/5 rounded-lg">
                       <span className="text-emerald-400 mt-0.5">•</span>
                       <span className="text-slate-300">{rule}</span>
@@ -303,8 +312,16 @@ export default function TournamentDetails({ params, searchParams }: {
             {activeTab === 'schedule' && (
               <div>
                 <h2 className="text-2xl font-bold text-white mb-4">Tournament Schedule</h2>
+                <div className="mb-4 p-3 bg-emerald-500/20 border border-emerald-500/30 rounded-lg">
+                  <p className="text-emerald-400 text-sm font-medium">
+                    🕐 Tournament runs from <strong>2:00 PM</strong> to <strong>9:00 PM</strong>
+                  </p>
+                  <p className="text-slate-300 text-xs mt-1">
+                    All matches will be conducted between these hours
+                  </p>
+                </div>
                 <div className="space-y-3">
-                  {tournament.schedule.map((item: { time: string; event: string }, index: number) => (
+                  {tournament.schedule?.map((item: { time: string; event: string }, index: number) => (
                     <div key={index} className="flex items-center gap-4 p-3 bg-white/5 rounded-lg">
                       <div className="text-emerald-400 font-medium min-w-[80px]">{item.time}</div>
                       <div className="text-slate-300">{item.event}</div>
@@ -329,7 +346,7 @@ export default function TournamentDetails({ params, searchParams }: {
                 </div>
               ) : (
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {teams.map((team) => (
+                  {teams?.map((team) => (
                     <div key={team.id} className="card-glass p-4 bg-white/5 rounded-lg">
                       <div className="flex items-center justify-between mb-3">
                         <h3 className="text-lg font-semibold text-white">{team.name}</h3>
@@ -349,7 +366,7 @@ export default function TournamentDetails({ params, searchParams }: {
                         <div>
                           <span className="text-slate-400">Members:</span>
                           <div className="mt-1 space-y-1">
-                            {team.members.map((member: string, index: number) => (
+                            {team.members?.map((member: string, index: number) => (
                               <div key={index} className="text-slate-300">
                                 • {member}
                               </div>

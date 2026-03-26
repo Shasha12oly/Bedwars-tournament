@@ -31,17 +31,12 @@ export default function BottomNav() {
         </svg>
         <span className="text-xs font-medium truncate max-w-[72px]">Matches</span>
       </Link>
-      <Link className="flex min-w-0 flex-1 flex-col items-center gap-1 px-2 py-3 transition-colors duration-200 text-slate-400 active:bg-white/5" href="/database-status">
+      <Link className="flex min-w-0 flex-1 flex-col items-center gap-1 px-2 py-3 transition-colors duration-200 text-slate-400 active:bg-white/5" href="/rules">
         <svg className="h-6 w-6 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <path d="M9 11H3v2h6v-2zm0-4H3v2h6V7zm0 8H3v2h6v-2zm12-8h-6v2h6V7zm0 4h-6v2h6v-2z"></path>
+          <path d="M12 2v20m8-11H4"></path>
+          <circle cx="12" cy="12" r="10"></circle>
         </svg>
-        <span className="text-xs font-medium truncate max-w-[72px]">Status</span>
-      </Link>
-      <Link className="flex min-w-0 flex-1 flex-col items-center gap-1 px-2 py-3 transition-colors duration-200 text-slate-400 active:bg-white/5" href="/bot-test">
-        <svg className="h-6 w-6 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <path d="M9 11H3v2h6v-2zm0-4H3v2h6V7zm0 8H3v2h6v-2zm12-8h-6v2h6V7zm0 4h-6v2h6v-2z"></path>
-        </svg>
-        <span className="text-xs font-medium truncate max-w-[72px]">Bot Test</span>
+        <span className="text-xs font-medium truncate max-w-[72px]">Rules</span>
       </Link>
     </nav>
   );

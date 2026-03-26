@@ -160,8 +160,8 @@ export default function TournamentsPage() {
                     <span className="text-white font-medium">{tournament.currentTeams}/{tournament.maxSlots}</span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-slate-400">Prizes</span>
-                    <span className="text-emerald-400 font-bold text-right text-xs max-w-[150px] whitespace-pre-line">{tournament.prizePool}</span>
+                    <span className="text-slate-400">Prize Pool</span>
+                    <span className="text-emerald-400 font-bold">{tournament.prizePool}</span>
                   </div>
                 </div>
 

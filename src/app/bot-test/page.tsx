@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 
 export default function BotTest() {
-  const [status, setStatus] = useState('Checking bot status...');
+  const [status, setStatus] = useState('BedWars Tournament Bot made by Sharmagaming - Checking status...');
   const [logs, setLogs] = useState<string[]>([]);
   const [isConnecting, setIsConnecting] = useState(false);
 
@@ -30,7 +30,7 @@ export default function BotTest() {
       
       if (!response.ok) {
         const errorText = await response.text();
-        setStatus('❌ Bot connection failed');
+        setStatus('❌ BedWars Tournament Bot - Connection failed');
         addLog(`❌ HTTP Error: ${response.status} ${errorText}`);
         setIsConnecting(false);
         return;
@@ -39,15 +39,15 @@ export default function BotTest() {
       const result = await response.json();
       
       if (result.ok) {
-        setStatus('✅ Bot is connected and online!');
-        addLog('✅ Bot connection successful');
+        setStatus('✅ BedWars Tournament Bot made by Sharmagaming - Online and ready!');
+        addLog('✅ BedWars Tournament Bot connection successful');
         addLog(`📊 Response: ${JSON.stringify(result, null, 2)}`);
       } else {
-        setStatus('❌ Bot connection failed');
+        setStatus('❌ BedWars Tournament Bot - Connection failed');
         addLog(`❌ Error: ${result.error}`);
       }
     } catch (error) {
-      setStatus('❌ Connection error');
+      setStatus('❌ BedWars Tournament Bot - Connection error');
       addLog(`❌ Network error: ${error}`);
     } finally {
       setIsConnecting(false);

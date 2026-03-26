@@ -260,13 +260,48 @@ export default function Matches() {
     <div className="pb-bottom-nav md:pb-0 min-h-screen flex flex-col">
       <Navbar />
       
-      <main className="flex-1">
-        <div className="relative mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-12 md:px-8">
+      <main className="flex-1 mobile-optimized">
+        <div className="relative mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-12 md:px-8 safe-area-padding">
           
           {/* Header */}
           <section className="mb-8">
             <h1 className="text-3xl font-bold text-white sm:text-4xl md:text-5xl">Live Matches</h1>
             <p className="mt-2 text-slate-400">Watch ongoing and upcoming tournament matches</p>
+          </section>
+
+          {/* Time Notice Banner - Mobile Optimized */}
+          <section className="mb-8">
+            <div className="relative overflow-hidden rounded-xl border border-amber-500/30 bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-amber-500/10 backdrop-blur-sm">
+              {/* Mobile-optimized content */}
+              <div className="relative p-4 sm:p-6">
+                <div className="flex items-start gap-3 sm:gap-4">
+                  <div className="flex-shrink-0">
+                    <div className="w-8 h-8 sm:w-10 sm:h-10 bg-amber-500/20 rounded-full flex items-center justify-center">
+                      <span className="text-amber-400 text-lg sm:text-xl">⏰</span>
+                    </div>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-base sm:text-lg font-semibold text-white mb-1 sm:mb-2">
+                      Important Time Information
+                    </h3>
+                    <div className="space-y-1 sm:space-y-2">
+                      <p className="text-amber-400 text-sm sm:text-base font-medium">
+                        📅 Tournament Date: <strong>March 29, 2026</strong>
+                      </p>
+                      <p className="text-white text-sm sm:text-base">
+                        🕐 Time Window: <strong>2:00 PM - 9:00 PM</strong>
+                      </p>
+                      <p className="text-slate-300 text-xs sm:text-sm leading-relaxed">
+                        ⚠️ Match times shown are estimates only. The tournament will be held between 2:00 PM and 9:00 PM. Actual match timing may vary based on match duration and organization.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Subtle animated border for mobile */}
+              <div className="absolute inset-0 rounded-xl border border-amber-500/20 animate-pulse"></div>
+            </div>
           </section>
 
           {/* Filter Tabs */}
@@ -305,9 +340,8 @@ export default function Matches() {
                     <div className="flex items-center gap-3">
                       <div className="relative">
                         <span className="text-2xl animate-pulse">🔴</span>
-                        <div className="absolute inset-0 rounded-full bg-red-500/30 animate-ping"></div>
                       </div>
-                      <h2 className="text-2xl font-bold text-white animate-pulse">LIVE NOW</h2>
+                      <h2 className="text-2xl font-bold text-white mb-2">Live Matches</h2>
                     </div>
                     <div className="flex items-center gap-2">
                       <div className="bg-red-500/20 text-red-400 px-3 py-1 rounded-full font-bold text-sm animate-pulse">
@@ -320,7 +354,7 @@ export default function Matches() {
                     {filteredMatches.filter(m => m.status === 'live').map((match, index) => (
                       <div 
                         key={match.id} 
-                        className="relative bg-gradient-to-r from-white/10 via-white/5 to-white/10 rounded-lg p-4 border border-white/20 backdrop-blur-sm transition-all duration-500 hover:scale-102 hover:shadow-xl hover:shadow-red-500/20"
+                        className="relative bg-gradient-to-r from-white/10 via-white/5 to-white/10 rounded-lg p-3 sm:p-4 border border-white/20 backdrop-blur-sm transition-all duration-500 hover:scale-[1.02] sm:hover:scale-105 hover:shadow-xl hover:shadow-red-500/20"
                         style={{
                           animationDelay: `${index * 200}ms`,
                           animation: 'slideInUp 0.6s ease-out forwards'
@@ -329,38 +363,38 @@ export default function Matches() {
                         {/* Live indicator glow */}
                         <div className="absolute top-2 right-2">
                           <div className="relative">
-                            <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
+                            <div className="w-2 h-2 sm:w-3 sm:h-3 bg-red-500 rounded-full animate-pulse"></div>
                             <div className="absolute inset-0 bg-red-500 rounded-full animate-ping"></div>
                           </div>
                         </div>
                         
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <div className="flex items-center gap-3 mb-2">
-                              <span className="text-emerald-400 font-bold">{match.tournamentName}</span>
-                              <span className="text-slate-300">•</span>
-                              <span className="text-slate-300">{match.round}</span>
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-2">
+                              <span className="text-emerald-400 font-bold text-sm sm:text-base truncate">{match.tournamentName}</span>
+                              <span className="text-slate-300 hidden sm:inline">•</span>
+                              <span className="text-slate-300 text-xs sm:text-sm">{match.round}</span>
                             </div>
                             
-                            <div className="flex items-center gap-6">
-                              <div className="flex items-center gap-4">
-                                <div className="text-center">
-                                  <div className="text-white font-bold text-lg drop-shadow-[0_0_10px_rgba(255,255,255,0.3)]">{match.player1}</div>
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6">
+                              <div className="flex items-center gap-2 sm:gap-4">
+                                <div className="text-center min-w-0 flex-1">
+                                  <div className="text-white font-bold text-sm sm:text-lg truncate drop-shadow-[0_0_10px_rgba(255,255,255,0.3)]">{match.player1}</div>
                                 </div>
-                                <div className="bg-gradient-to-r from-red-500 to-red-600 text-white font-bold px-3 py-1 rounded-full shadow-lg animate-pulse">
+                                <div className="bg-gradient-to-r from-red-500 to-red-600 text-white font-bold px-2 py-1 sm:px-3 sm:py-1 rounded-full shadow-lg animate-pulse text-xs sm:text-sm">
                                   LIVE
                                 </div>
-                                <div className="text-center">
-                                  <div className="text-white font-bold text-lg drop-shadow-[0_0_10px_rgba(255,255,255,0.3)]">{match.player2}</div>
+                                <div className="text-center min-w-0 flex-1">
+                                  <div className="text-white font-bold text-sm sm:text-lg truncate drop-shadow-[0_0_10px_rgba(255,255,255,0.3)]">{match.player2}</div>
                                 </div>
                               </div>
                             </div>
                           </div>
                           
-                          <div className="text-right">
-                            <span className="text-3xl">{getFormatIcon(match.format)}</span>
-                            <div className="mt-2">
-                              <button className="group relative bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white py-2 px-4 rounded-lg font-bold transition-all duration-300 transform hover:scale-105 shadow-lg shadow-red-500/30">
+                          <div className="text-right sm:text-left">
+                            <span className="text-2xl sm:text-3xl">{getFormatIcon(match.format)}</span>
+                            <div className="mt-2 sm:mt-2">
+                              <button className="group relative bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white py-2 px-3 sm:px-4 rounded-lg font-bold transition-all duration-300 transform hover:scale-105 shadow-lg shadow-red-500/30 text-sm sm:text-base">
                                 <span className="relative z-10 flex items-center gap-2">
                                   <span className="animate-pulse">▶️</span>
                                   Watch Now

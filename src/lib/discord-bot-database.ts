@@ -93,13 +93,13 @@ class TournamentDatabaseWithBot {
           'Rule break = immediate disqualification'
         ],
         schedule: [
-          { time: '1:30 PM', event: 'Check-in opens' },
-          { time: '2:00 PM', event: 'Tournament begins' },
-          { time: '3:00 PM', event: 'Round 1' },
-          { time: '4:30 PM', event: 'Round 2' },
-          { time: '6:00 PM', event: 'Semi-finals' },
-          { time: '7:30 PM', event: 'Finals' },
-          { time: '8:45 PM', event: 'Awards ceremony' }
+          { time: '2:00 PM', event: 'Registration closes' },
+          { time: '2:15 PM', event: 'Tournament begins' },
+          { time: '2:30 PM', event: 'Round of 16 starts' },
+          { time: '4:15 PM', event: 'Quarterfinals' },
+          { time: '6:30 PM', event: 'Semifinals' },
+          { time: '8:30 PM', event: 'Finals' },
+          { time: '9:00 PM', event: 'Awards ceremony' }
         ]
       }
     ];

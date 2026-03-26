@@ -57,19 +57,17 @@ export default function TournamentRegister({ params }: { params: Promise<{ id: s
     const loadTournament = async () => {
       try {
         console.log('Loading tournament for registration, ID:', resolvedParams.id);
-        const tournamentData = await getTournament(resolvedParams.id);
-        const teamsData = await getTeams(resolvedParams.id);
-        const teamCount = await getTeamCount(resolvedParams.id);
+        
+        // Get tournament data from server API
+        const tournamentsResponse = await fetch('/api/tournaments');
+        const tournaments = await tournamentsResponse.json();
+        const tournamentData = tournaments.find((t: any) => t.id === resolvedParams.id);
+        
         console.log('Tournament data from database:', tournamentData);
-        console.log('Teams count:', teamCount);
         
         if (tournamentData) {
           console.log('Setting tournament data for registration:', tournamentData);
-          setTournament({
-            ...tournamentData,
-            registered: teamCount,
-            slots: tournamentData.maxSlots
-          });
+          setTournament(tournamentData);
         } else {
           console.log('Tournament not found in database');
           router.push('/tournaments');
@@ -87,6 +85,10 @@ export default function TournamentRegister({ params }: { params: Promise<{ id: s
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+    // Close team suggestions when user starts typing their own team name
+    if (field === 'teamName' && value.length > 0) {
+      setShowTeamSuggestions(false);
+    }
   };
 
   const handleTeammateDiscordChange = (index: number, value: string) => {
@@ -107,42 +109,86 @@ export default function TournamentRegister({ params }: { params: Promise<{ id: s
     setError('');
     
     try {
+      // Get tournament data from server
+      const tournamentsResponse = await fetch('/api/tournaments');
+      const tournaments = await tournamentsResponse.json();
+      const tournament = tournaments.find((t: any) => t.id === resolvedParams.id);
+
       if (!tournament) {
-        throw new Error('Tournament not found');
+        setError('Tournament not found');
+        return;
       }
 
-      // Validate form data
-      if (!formData.teamName || !formData.minecraftIGN || !formData.discord) {
-        throw new Error('Please fill in all required fields');
+      // Prepare team data
+      const teamData = {
+        name: formData.teamName.trim(),
+        captain: formData.minecraftIGN.trim(),
+        members: [formData.minecraftIGN.trim(), ...formData.teammates.filter(t => t.trim())],
+        discordUsers: [formData.discord.trim(), ...formData.teammateDiscords.filter(d => d.trim())],
+        rewardReceiver: formData.rewardReceiver.trim() || formData.minecraftIGN.trim()
+      };
+
+      // Register team via server API
+      const response = await fetch('/api/tournaments', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          tournament: tournament,
+          team: teamData
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        if (response.status === 400 && result.error?.includes('already exists')) {
+          setError('A team with this name is already registered for this tournament');
+        } else if (response.status === 400 && result.error?.includes('full')) {
+          setError('This tournament is full');
+        } else {
+          setError(result.error || 'Registration failed');
+        }
+        return;
       }
 
-      // Create team members array (captain + teammates)
-      const members = [formData.minecraftIGN, ...formData.teammates.filter(t => t.trim() !== '')];
-      
-      // Create all Discord usernames array
-      const allDiscordUsers = [formData.discord, ...formData.teammateDiscords.filter(d => d.trim() !== '')];
-      
-      // Create player options for reward selector
-      const allPlayers = [formData.minecraftIGN, ...formData.teammates.filter(t => t.trim() !== '')];
-      const selectedRewardReceiver = formData.rewardReceiver === 'captain' ? formData.minecraftIGN : 
-        allPlayers.find(p => p === formData.rewardReceiver) || formData.minecraftIGN;
-
-      // Register team in database
-      await registerTeam({
-        name: formData.teamName,
-        captain: formData.minecraftIGN,
-        members: members,
-        discord: allDiscordUsers.join(', '), // Include all Discord usernames
-        rewardReceiver: selectedRewardReceiver
-      }, resolvedParams.id);
-
-      // Redirect to tournament details with success message
+      // Success - redirect to tournament page
       router.push(`/tournaments/${resolvedParams.id}?registered=true`);
-    } catch (error: any) {
-      setError(error.message || 'Registration failed. Please try again.');
+
+    } catch (error) {
+      console.error('Registration error:', error);
+      setError('Network error. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const validateForm = () => {
+    if (!formData.teamName.trim()) {
+      setError('Team name is required');
+      return false;
+    }
+    if (!formData.minecraftIGN.trim()) {
+      setError('Captain Minecraft name is required');
+      return false;
+    }
+    if (!formData.discord.trim()) {
+      setError('Captain Discord is required');
+      return false;
+    }
+    if (tournament.format === 'Duo' && !formData.teammates[0].trim()) {
+      setError('Teammate name is required');
+      return false;
+    }
+    if (tournament.format === 'rbw 4v4') {
+      const emptyTeammates = formData.teammates.filter(t => !t.trim());
+      if (emptyTeammates.length > 0) {
+        setError('All teammate names are required');
+        return false;
+      }
+    }
+    return true;
   };
 
   const getTeammateFields = () => {
@@ -367,8 +413,8 @@ export default function TournamentRegister({ params }: { params: Promise<{ id: s
     <div className="min-h-screen flex flex-col">
       <Navbar />
       
-      <main className="flex-1">
-        <div className="relative mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-12 md:px-8">
+      <main className="flex-1 mobile-optimized">
+        <div className="relative mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-12 md:px-8 safe-area-padding">
           
           {/* Header */}
           <section className="mb-8">
@@ -401,12 +447,14 @@ export default function TournamentRegister({ params }: { params: Promise<{ id: s
               <div>
                 <span className="text-sm text-slate-400 uppercase tracking-wider font-semibold">Prize Pool</span>
                 <div className="mt-2 space-y-1">
-                  {tournament.prize.split('|').map((prize: string, index: number) => (
+                  {tournament.prizePool ? tournament.prizePool.split('\n').map((prize: string, index: number) => (
                     <div key={index} className="flex items-start gap-2">
                       <span className="text-amber-400 text-xs mt-0.5">🏆</span>
                       <span className="text-emerald-400 font-medium text-sm">{prize.trim()}</span>
                     </div>
-                  ))}
+                  )) : (
+                    <div className="text-slate-400 text-sm">No prize information</div>
+                  )}
                 </div>
               </div>
             </div>

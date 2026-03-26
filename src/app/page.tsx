@@ -11,8 +11,8 @@ export default function Home() {
     <div className="pb-bottom-nav md:pb-0 min-h-screen flex flex-col">
       <Navbar />
       
-      <main className="min-h-screen">
-        <div className="relative mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-12 md:px-8 md:py-12 lg:py-16">
+      <main className="min-h-screen mobile-optimized">
+        <div className="relative mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-12 md:px-8 md:py-12 lg:py-16 safe-area-padding">
           
           {/* Hero Section */}
           <section className="relative mb-12 min-h-[520px] px-4 py-8 text-center sm:px-6 sm:py-10 md:mb-20 md:px-10 md:py-12 lg:px-16 lg:py-14 flex items-center justify-center">

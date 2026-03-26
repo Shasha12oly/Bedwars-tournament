@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { mentionForUsernameInGuild } from '@/lib/discord-mentions';
+import { getTeamCountFromFile } from '@/lib/file-storage';
 
 // Discord Gateway connection for "online" status
 let gatewayWs: WebSocket | null = null;
@@ -7,14 +8,11 @@ let heartbeatInterval: NodeJS.Timeout | null = null;
 let isGatewayInitialized = false;
 
 // Auto-connect gateway on module load
-let gatewayInitialized = false;
-
-// Auto-initialize gateway immediately when module loads
 (async () => {
   const botToken = process.env.DISCORD_BOT_TOKEN;
-  if (botToken && !gatewayInitialized) {
-    gatewayInitialized = true;
-    console.log('� Module loaded - Auto-initializing Discord Gateway connection...');
+  if (botToken && !isGatewayInitialized) {
+    isGatewayInitialized = true;
+    console.log('🚀 Module loaded - Auto-initializing Discord Gateway connection...');
     await connectGateway(botToken);
     
     // Start heartbeat after connection is established
@@ -26,26 +24,6 @@ let gatewayInitialized = false;
     }, 5000); // Start heartbeat 5 seconds after connection
   }
 })();
-
-// Start heartbeat interval
-function startHeartbeat() {
-  if (heartbeatInterval) {
-    clearInterval(heartbeatInterval); // Clear existing interval
-  }
-  
-  // Only start if gateway is connected
-  if (gatewayWs && gatewayWs.readyState === WebSocket.OPEN) {
-    console.log('💓 Starting continuous heartbeat system...');
-    heartbeatInterval = setInterval(() => {
-      if (gatewayWs && gatewayWs.readyState === WebSocket.OPEN) {
-        gatewayWs.send(JSON.stringify({ op: 1, d: null })); // Heartbeat
-        console.log('💓 Heartbeat sent to Discord Gateway');
-      }
-    }, 30000); // 30 seconds
-  } else {
-    console.log('❌ Cannot start heartbeat - Gateway not connected');
-  }
-}
 
 async function connectGateway(token: string) {
   if (gatewayWs && gatewayWs.readyState === WebSocket.OPEN) {
@@ -132,20 +110,60 @@ async function connectGateway(token: string) {
     gatewayWs.onerror = (error) => {
       console.error('❌ Discord Gateway error:', error);
     };
-
   } catch (error) {
     console.error('❌ Failed to connect to Discord Gateway:', error);
   }
 }
 
+// Start heartbeat interval
+function startHeartbeat() {
+  if (heartbeatInterval) {
+    clearInterval(heartbeatInterval); // Clear existing interval
+  }
+  
+  // Only start if gateway is connected
+  if (gatewayWs && gatewayWs.readyState === WebSocket.OPEN) {
+    console.log('💓 Starting continuous heartbeat system...');
+    heartbeatInterval = setInterval(() => {
+      if (gatewayWs && gatewayWs.readyState === WebSocket.OPEN) {
+        gatewayWs.send(JSON.stringify({ op: 1, d: null })); // Heartbeat
+        console.log('💓 Heartbeat sent to Discord Gateway');
+      }
+    }, 30000); // 30 seconds
+  } else {
+    console.log('❌ Cannot start heartbeat - Gateway not connected');
+  }
+}
+
 export async function POST(req: Request) {
   try {
-    // Gateway auto-initializes when module loads, no need to call here
     const botToken = process.env.DISCORD_BOT_TOKEN;
     const channelId = process.env.DISCORD_CHANNEL_ID;
     const guildId = process.env.DISCORD_GUILD_ID;
 
-    console.log('📝 Team registration request received - initializing Discord connection...');
+    console.log('📝 Processing team registration request...');
+    
+    // Parse request body
+    const requestBody = await req.json();
+    const { team, tournament } = requestBody;
+
+    console.log('📊 Request data:', {
+      hasTeam: !!team,
+      hasTournament: !!tournament,
+      teamName: team?.name,
+      captainName: team?.captain,
+      membersCount: team?.members?.length || 0,
+      discordUsers: team?.discordUsers,
+      tournamentName: tournament?.name,
+      channelId: channelId,
+      botTokenPresent: !!botToken,
+      botTokenLength: botToken ? botToken.length : 0
+    });
+
+    if (!team || !tournament) {
+      console.error('❌ Missing team or tournament data');
+      return NextResponse.json({ ok: false, error: 'Missing team or tournament in request body' }, { status: 400 });
+    }
 
     if (!botToken) {
       return NextResponse.json({ ok: false, error: 'Missing DISCORD_BOT_TOKEN' }, { status: 500 });
@@ -159,65 +177,62 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: 'Missing DISCORD_GUILD_ID' }, { status: 500 });
     }
 
-    // Initialize gateway connection for "online" status (only once)
-    if (!gatewayInitialized) {
-      gatewayInitialized = true;
-      // Connect gateway in background (don't await)
-      connectGateway(botToken);
-    }
-
-    const body = await req.json();
-    const { team, tournament } = body ?? {};
-
-    if (!team || !tournament) {
-      return NextResponse.json({ ok: false, error: 'Missing team or tournament in request body' }, { status: 400 });
-    }
-
     // Parse team members and Discord users (captain first)
-    const members = Array.isArray(team.members) ? (team.members as string[]) : [];
-    const discordUsers = typeof team.discord === 'string'
-      ? team.discord.split(',').map((u: string) => u.trim()).filter(Boolean)
-      : [];
+    const members = Array.isArray(team.members) ? team.members : [];
+    const discordUsers = Array.isArray(team.discordUsers) ? team.discordUsers : [];
 
     // Resolve Discord usernames -> real userIds for proper pings
-    const resolvedMentions: (string | null)[] = await Promise.all(
+    const resolved = await Promise.all(
       members.map(async (_member: string, index: number) => {
         const discordUsername = discordUsers[index];
-        if (!discordUsername) return null;
-        const { mention } = await mentionForUsernameInGuild({
-          botToken,
-          guildId,
-          usernameOrAt: discordUsername,
-        });
-        return mention;
+        
+        if (!discordUsername) {
+          return { mention: null as string | null, userId: null as string | null };
+        }
+        
+        try {
+          const result = await mentionForUsernameInGuild({
+            botToken,
+            guildId,
+            usernameOrAt: discordUsername,
+          });
+          return result;
+        } catch (err) {
+          console.error(`Failed to resolve Discord user "${discordUsername}":`, err);
+          return { mention: null as string | null, userId: null as string | null };
+        }
       })
     );
 
+    const resolvedMentions: (string | null)[] = resolved.map(r => r.mention);
+    const resolvedUserIds: string[] = resolved.map(r => r.userId).filter((x): x is string => Boolean(x));
+
     const pingMentions = members.map((member: string, index: number) => {
       const mention = resolvedMentions[index];
-      return mention ?? member;
+      return mention ?? `@${member}`;
     });
 
-    const allowedUserIds = resolvedMentions
-      .filter((m): m is string => Boolean(m))
-      .map((m: string) => m.replace('<@', '').replace('>', ''));
+    const allowedUserIds = [...resolvedUserIds];
     
     // Also resolve reward receiver if provided
     let rewardReceiverMention: string | null = null;
     if (team.rewardReceiver) {
       const rewardUsername = typeof team.rewardReceiver === 'string' ? team.rewardReceiver.trim() : '';
-      // Map IGN to corresponding Discord username if available
-      const memberIndex = members.findIndex(m => m === rewardUsername);
+      const memberIndex = members.findIndex((m: string) => m === rewardUsername);
       const rewardDiscord = memberIndex >= 0 ? discordUsers[memberIndex] : null;
       if (rewardDiscord) {
-        const resolved = await mentionForUsernameInGuild({
-          botToken,
-          guildId,
-          usernameOrAt: rewardDiscord,
-        });
-        rewardReceiverMention = resolved.mention;
-        if (resolved.userId) {
-          allowedUserIds.push(resolved.userId);
+        try {
+          const resolved = await mentionForUsernameInGuild({
+            botToken,
+            guildId,
+            usernameOrAt: rewardDiscord,
+          });
+          rewardReceiverMention = resolved.mention;
+          if (resolved.userId) {
+            allowedUserIds.push(resolved.userId);
+          }
+        } catch (err) {
+          console.error(`Failed to resolve reward receiver Discord user "${rewardDiscord}":`, err);
         }
       }
     }
@@ -230,6 +245,10 @@ export async function POST(req: Request) {
       return `${pingMentions[index]} (${member})`;
     }).join('\n');
 
+    // Get current team count for registration progress (this is the new team being registered)
+    const currentTeams = await getTeamCountFromFile(tournament.id);
+    const maxSlots = tournament.maxSlots || 16; // Default to 16 if not specified
+    
     const embed = {
       title: '🎮 New Team Registration!',
       color: 0x00ff00,
@@ -239,15 +258,16 @@ export async function POST(req: Request) {
         { name: '👥 Team Name', value: String(team.name ?? 'Unknown'), inline: true },
         { name: '👑 Captain', value: `${pingMentions[0]} (${String(team.captain ?? 'Unknown')})`, inline: true },
         { name: '🔗 Captain Discord', value: String(discordUsers[0] ?? 'Unknown'), inline: true },
+        { name: '📊 Registration Progress', value: `${currentTeams}/${maxSlots} teams registered`, inline: true },
         { name: '📅 Registered At', value: team.registeredAt ? new Date(team.registeredAt).toLocaleString() : new Date().toLocaleString(), inline: true },
-        { name: '🎯 Reward Receiver', value: rewardReceiverMention ?? (team.rewardReceiver ? `@${team.rewardReceiver}` : 'Captain'), inline: true },
+        { name: '🎯 Reward Receiver', value: rewardReceiverMention ?? (team.rewardReceiver === 'captain' ? `@${team.captain}` : `@${team.rewardReceiver}`), inline: true },
       ],
       timestamp: new Date().toISOString(),
-      footer: { text: '⚔️ BedWars Tournament System' },
+      footer: { text: '⚔️ BedWars Tournament Bot made by Sharmagaming' },
     };
 
     // Add beautiful content with pings
-    const content = `🎮 **New Team Registration!** 🎉\n\n${pingMentions.join(' ')} - Your team **${team.name}** has been successfully registered for **${tournament.name}**! 🏆`;
+    const content = `🎮 **New Team Registration!** 🎉\n\n${pingMentions.join(' ')} - Your team **${team.name}** has been successfully registered for **${tournament.name}**! 🏆\n\n📊 **Registration Progress:** ${currentTeams}/${maxSlots} teams registered`;
 
     console.log('📝 Sending Discord message with data:', {
       content: content.substring(0, 200),
