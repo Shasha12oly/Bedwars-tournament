@@ -3,10 +3,10 @@ import { getTeamsFromFile, saveTeamsToFile } from '@/lib/file-storage';
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { teamId: string } }
+  { params }: { params: Promise<{ teamId: string }> }
 ) {
   try {
-    const { teamId } = params;
+    const { teamId } = await params;
 
     if (!teamId) {
       return NextResponse.json({ error: 'Team ID is required' }, { status: 400 });
