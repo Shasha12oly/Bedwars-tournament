@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getTeamsFromFile, saveTeamsToFile } from '@/lib/file-storage';
+import { getTeamsFromFile, saveTeamsToFile } from '@/lib/persistent-storage';
 
 export async function DELETE(
   request: Request,

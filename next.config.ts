@@ -5,13 +5,13 @@ const nextConfig: NextConfig = {
   compress: true,
   poweredByHeader: false,
   
-  // Static export for Render
-  output: 'export',
-  trailingSlash: true,
+  // Web Service deployment (not static export)
+  // output: 'export', // REMOVED for Web Service
+  // trailingSlash: true, // REMOVED for Web Service
   
-  // Disable image optimization in static export
+  // Enable image optimization for Web Service
   images: {
-    unoptimized: true,
+    // unoptimized: true, // REMOVED for Web Service
   },
   
   // Security headers

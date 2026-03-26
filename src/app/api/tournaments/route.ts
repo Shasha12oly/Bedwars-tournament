@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getTeamsFromFile, saveTeamsToFile, getTournamentsFromFile, getTeamCountFromFile } from '@/lib/file-storage';
+import { getTeamsFromFile, saveTeamsToFile, getTournamentsFromFile, getTeamCountFromFile } from '@/lib/persistent-storage';
 
 export async function GET() {
   try {
