@@ -5,6 +5,7 @@ interface MatchMakingResult {
   matches: Match[];
   tournamentId: string;
   totalTeams: number;
+  bracketSize: number;
   bracketGenerated: boolean;
 }
 
@@ -47,7 +48,7 @@ export async function generateTournamentMatches(tournamentId: string): Promise<M
         status: 'matches_generated',
         totalTeams: teams.length,
         bracketSize: getBracketSize(teams.length),
-        bracketGenerated: true
+        matchesGenerated: true
       });
     }
     
@@ -57,6 +58,7 @@ export async function generateTournamentMatches(tournamentId: string): Promise<M
       matches,
       tournamentId,
       totalTeams: teams.length,
+      bracketSize: getBracketSize(teams.length),
       bracketGenerated: true
     };
     
