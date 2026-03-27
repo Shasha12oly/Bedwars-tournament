@@ -26,6 +26,7 @@ export const metadata: Metadata = {
     telephone: false,
   },
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'),
+  themeColor: '#10b981',
   openGraph: {
     title: "BedWars Tournament Platform",
     description: "Professional BedWars tournament management with Discord integration",
@@ -65,7 +66,6 @@ export const metadata: Metadata = {
     initialScale: 1,
     maximumScale: 5,
     userScalable: true,
-    themeColor: '#10b981',
   },
 };
 

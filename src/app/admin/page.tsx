@@ -617,57 +617,64 @@ const updateNextRoundMatches = async (completedMatch: Match, winner: string, cur
     
     if (targetMatch) {
       try {
-        // Update local state
-        let updatedMatch;
-        const updatedMatches = currentMatches.map(match => {
-          if (match.id === targetMatch.id) {
-            // Fill the first available slot (player1 or player2)
-            if (match.player1 === 'TBD') {
-              updatedMatch = { ...match, player1: winner };
-              console.log(`✅ Updated ${targetMatch.id}.player1 = ${winner}`);
-              return updatedMatch;
-            } else if (match.player2 === 'TBD') {
-              updatedMatch = { ...match, player2: winner };
-              console.log(`✅ Updated ${targetMatch.id}.player2 = ${winner}`);
-              return updatedMatch;
-            }
-          }
-          return match;
-        });
-        
-        setMatches(updatedMatches);
-
         // Update the specific match in database
-        if (updatedMatch) {
+        // Find the current match to update
+        const currentMatch = currentMatches.find(m => m.id === targetMatch.id);
+        
+        if (currentMatch) {
           const updateData: any = {};
-          if (updatedMatch.player1 !== targetMatch.player1) {
-            updateData.player1 = updatedMatch.player1;
+          
+          // Fill the first available slot (player1 or player2)
+          if (currentMatch.player1 === 'TBD') {
+            updateData.player1 = winner;
+            console.log(`✅ Updated ${targetMatch.id}.player1 = ${winner}`);
+          } else if (currentMatch.player2 === 'TBD') {
+            updateData.player2 = winner;
+            console.log(`✅ Updated ${targetMatch.id}.player2 = ${winner}`);
           }
-          if (updatedMatch.player2 !== targetMatch.player2) {
-            updateData.player2 = updatedMatch.player2;
+          
+          if (targetMatch) {
+      try {
+        // Update the specific match in database
+        // Find the current match to update
+        const currentMatch = currentMatches.find(m => m.id === targetMatch.id);
+        
+        if (currentMatch) {
+          const updateData: any = {};
+          
+          // Fill the first available slot (player1 or player2)
+          if (currentMatch.player1 === 'TBD') {
+            updateData.player1 = winner;
+            console.log(`✅ Updated ${targetMatch.id}.player1 = ${winner}`);
+          } else if (currentMatch.player2 === 'TBD') {
+            updateData.player2 = winner;
+            console.log(`✅ Updated ${targetMatch.id}.player2 = ${winner}`);
           }
           
           await updateSingleMatch(targetMatch.id, updateData);
           console.log(`✅ Updated next round match ${targetMatch.id} with winner: ${winner}`);
         }
-
-        // Dispatch custom event to update matches page with next round changes
-        window.dispatchEvent(new CustomEvent('matchUpdate', {
-          detail: { 
-            action: 'nextRound', 
-            winner, 
-            targetMatchId: targetMatch.id,
-            round: targetMatch.round,
-            timestamp: Date.now()
-          }
-        }));
       } catch (error) {
-        console.error('Error updating next round matches:', error);
-        // Revert local state on error
-        setMatches(currentMatches);
+        console.error('❌ Error updating next round match:', error);
+        setMessage('Error updating next round match');
       }
     }
+
+    // Dispatch custom event to update matches page with next round changes
+    window.dispatchEvent(new CustomEvent('matchUpdate', {
+      detail: { 
+        action: 'nextRound', 
+        winner, 
+        targetMatchId: targetMatch.id,
+        round: targetMatch.round,
+        timestamp: Date.now()
+      }
+    }));
   } catch (error) {
+    console.error('Error updating next round matches:', error);
+    // Revert local state on error
+    setMatches(currentMatches);
+  }
     console.error('Error in updateNextRoundMatches:', error);
   }
   };
