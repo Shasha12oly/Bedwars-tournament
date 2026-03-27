@@ -670,28 +670,21 @@ const updateNextRoundMatches = async (completedMatch: Match, winner: string, cur
         timestamp: Date.now()
       }
     }));
-  } catch (error) {
-    console.error('Error updating next round matches:', error);
-    // Revert local state on error
-    setMatches(currentMatches);
-  }
-    console.error('Error in updateNextRoundMatches:', error);
-  }
   };
 
-  // Manual sync function to ensure both pages are synchronized
-  const syncMatches = async () => {
-    console.log('🔄 Admin: Manual sync triggered');
-    await loadMatches();
-    
-    // Dispatch sync event to notify matches page
-    window.dispatchEvent(new CustomEvent('matchUpdate', {
-      detail: { 
-        action: 'sync', 
-        timestamp: Date.now()
-      }
-    }));
-  };
+// Manual sync function to ensure both pages are synchronized
+const syncMatches = async () => {
+  console.log('🔄 Admin: Manual sync triggered');
+  await loadMatches();
+  
+  // Dispatch sync event to notify matches page
+  window.dispatchEvent(new CustomEvent('matchUpdate', {
+    detail: { 
+      action: 'sync', 
+      timestamp: Date.now()
+    }
+  }));
+};
 
   // Auto-sync every 30 seconds to ensure consistency
   useEffect(() => {
