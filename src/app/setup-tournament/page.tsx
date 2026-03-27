@@ -21,22 +21,8 @@ export default function SetupTournament() {
         status: 'open' as const,
         prize: 'Hero Rank in MCFleet (for reward receiver) | VIP+ in Hellcore (for reward receiver) | Special Discord role for all team members',
         description: 'Assemble your ultimate squad of 4 players and compete in this intense BedWars tournament. Strategy, teamwork, and skill will determine who emerges victorious.',
-        rules: [
-          'No cheating, hacking, or exploiting bugs',
-          'Respect all players and staff',
-          'Be on time for matches',
-          'Follow Discord server rules',
-          'Admin decisions are final'
-        ],
-        schedule: [
-          { time: '2:00 PM', event: 'Registration closes' },
-          { time: '2:15 PM', event: 'Tournament begins' },
-          { time: '2:30 PM', event: 'Round of 16 starts' },
-          { time: '4:15 PM', event: 'Quarterfinals' },
-          { time: '6:30 PM', event: 'Semifinals' },
-          { time: '8:30 PM', event: 'Finals' },
-          { time: '9:00 PM', event: 'Awards ceremony' }
-        ],
+        rules: 'No cheating, hacking, or exploiting bugs\nRespect all players and staff\nBe on time for matches\nFollow Discord server rules\nAdmin decisions are final',
+        schedule: '2:00 PM - Registration closes\n2:15 PM - Tournament begins\n2:30 PM - Round of 16 starts\n4:15 PM - Quarterfinals\n6:30 PM - Semifinals\n8:30 PM - Finals\n9:00 PM - Awards ceremony',
         prizePool: '✦ Hero Rank in MCFleet (for reward receiver)\n✦ VIP+ in Hellcore (for reward receiver)\n✦ Special Discord role for all team members'
       };
 

@@ -13,7 +13,8 @@ export default function TestFirebase() {
     captain: 'Test Captain',
     members: ['Player 1', 'Player 2', 'Player 3'],
     discord: 'test#1234',
-    tournamentId: '1'
+    tournamentId: '1',
+    status: 'registered' as const
   });
 
   useEffect(() => {
@@ -55,7 +56,8 @@ export default function TestFirebase() {
         captain: 'Test Captain',
         members: ['Player 1', 'Player 2', 'Player 3'],
         discord: 'test#1234',
-        tournamentId: '1'
+        tournamentId: '1',
+        status: 'registered' as const
       });
       
     } catch (err) {

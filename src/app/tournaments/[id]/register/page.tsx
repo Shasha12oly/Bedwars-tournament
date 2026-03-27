@@ -157,14 +157,16 @@ export default function TournamentRegister({ params }: { params: Promise<{ id: s
 
       // Check if tournament is now full and generate matches automatically
       try {
-        const currentTeams = await getTeamCount(tournament.id);
-        if (currentTeams >= tournament.maxSlots) {
-          console.log('🎯 Tournament is full, closing registration automatically...');
-          
-          // Close registration
-          await updateTournament(tournament.id, { ...tournament, status: 'closed' });
-          
-          console.log('✅ Registration closed! Matches must be generated manually by admin.');
+        if (tournament.id) {
+          const currentTeams = await getTeamCount(tournament.id);
+          if (currentTeams >= tournament.maxSlots) {
+            console.log('🎯 Tournament is full, closing registration automatically...');
+            
+            // Close registration
+            await updateTournament(tournament.id, { ...tournament, status: 'closed' });
+            
+            console.log('✅ Registration closed! Matches must be generated manually by admin.');
+          }
         }
       } catch (matchError) {
         console.error('Error in automatic match generation:', matchError);

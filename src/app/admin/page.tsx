@@ -62,6 +62,20 @@ export default function AdminDashboard() {
     return teams;
   };
 
+  // Helper function to get next round in tournament
+  const getNextRound = (currentRound: string): string => {
+    const roundProgression: { [key: string]: string } = {
+      'Round of 64': 'Round of 32',
+      'Round of 32': 'Round of 16', 
+      'Round of 16': 'Quarterfinals',
+      'Quarterfinals': 'Semifinals',
+      'Semifinals': 'Finals',
+      'Finals': 'Completed'
+    };
+    
+    return roundProgression[currentRound] || 'Finals';
+  };
+
   // Generate tournament matches automatically
   const generateMatches = async () => {
     if (!confirm('This will generate the tournament bracket and close registration. Continue?')) {
@@ -561,7 +575,7 @@ export default function AdminDashboard() {
       }
 
       // Update next round matches with winners using the updated matches
-      await updateNextRoundMatches(selectedMatch, winner, updatedMatches);
+      await updateNextRoundMatches(selectedMatch, winner, matches);
       
       setSelectedMatch(null);
       setWinner('');
@@ -585,17 +599,20 @@ export default function AdminDashboard() {
     }
   };
 
-const updateNextRoundMatches = async (completedMatch: Match, winner: string) => {
+const updateNextRoundMatches = async (completedMatch: Match, winner: string, currentMatches: Match[]) => {
     const currentRoundMatches = currentMatches.filter(m => m.round === completedMatch.round);
     const currentMatchIndex = currentRoundMatches.findIndex(m => m.id === completedMatch.id);
     
     console.log(`📊 Current round matches: ${currentRoundMatches.length}`);
     console.log(`📊 Current match index: ${currentMatchIndex}`);
+    console.log(`📊 Current round matches:`, currentRoundMatches.map(m => ({id: m.id, player1: m.player1, player2: m.player2})));
     
     // Calculate which slot in next round this winner should fill
     const nextRoundSlotIndex = Math.floor(currentMatchIndex / 2);
+    const nextRound = getNextRound(completedMatch.round);
     
     console.log(`📊 Next round slot index: ${nextRoundSlotIndex}`);
+    console.log(`📊 Next round: ${nextRound}`);
 
     const nextRoundMatches = currentMatches.filter(m => m.round === nextRound);
     const targetMatch = nextRoundMatches[nextRoundSlotIndex];
