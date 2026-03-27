@@ -22,7 +22,7 @@ interface Match {
 export default function AdminDashboard() {
   const router = useRouter();
   const [teamCount, setTeamCount] = useState(0);
-  const [tournamentStatus, setTournamentStatus] = useState<'open' | 'closed'>('open');
+  const [tournamentStatus, setTournamentStatus] = useState<'open' | 'closed' | 'matches_generated' | 'completed'>('open');
   const [isResetting, setIsResetting] = useState(false);
   const [message, setMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
