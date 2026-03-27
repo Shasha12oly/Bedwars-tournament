@@ -1,15 +1,10 @@
 import { NextResponse } from 'next/server';
-import { 
-  getTeamsHybrid, 
-  saveTeamsHybrid, 
-  getTournamentsHybrid, 
-  getTeamCountHybrid
-} from '@/lib/hybrid-storage';
+import { getTeamsFromFile, saveTeamsToFile, getTournamentsFromFile, getTeamCountFromFile } from '@/lib/file-storage';
 
 export async function GET() {
   try {
-    const tournaments = await getTournamentsHybrid();
-    const teams = await getTeamsHybrid();
+    const tournaments = await getTournamentsFromFile();
+    const teams = await getTeamsFromFile();
     
     // Add team counts to tournaments
     const tournamentsWithCounts = tournaments.map((tournament: any) => ({
@@ -33,7 +28,7 @@ export async function POST(request: Request) {
     }
 
     // Get existing teams
-    const teams = await getTeamsHybrid();
+    const teams = await getTeamsFromFile();
     
     // Check for duplicate team name
     const existingTeam = teams.find((t: any) => 
@@ -45,7 +40,7 @@ export async function POST(request: Request) {
     }
 
     // Check tournament capacity
-    const currentTeams = await getTeamCountHybrid(tournament.id);
+    const currentTeams = await getTeamCountFromFile(tournament.id);
     const maxSlots = tournament.maxSlots || 16;
 
     if (currentTeams >= maxSlots) {
@@ -65,9 +60,9 @@ export async function POST(request: Request) {
       status: 'registered'
     };
 
-    // Save team (Discord + LocalStorage backup)
+    // Save team to file
     teams.push(newTeam);
-    const saved = await saveTeamsHybrid(teams);
+    const saved = await saveTeamsToFile(teams);
 
     if (!saved) {
       return NextResponse.json({ error: 'Failed to save team registration' }, { status: 500 });

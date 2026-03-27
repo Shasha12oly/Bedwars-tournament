@@ -1,17 +1,14 @@
 import { NextResponse } from 'next/server';
-import { 
-  getTeamsHybrid, 
-  saveTeamsHybrid, 
-  getTournamentsHybrid,
-  getTeamCountHybrid
-} from '@/lib/hybrid-storage';
+import { getTeams, registerTeam } from '@/lib/firebase-database';
 
 export async function GET() {
   try {
-    const teams = await getTeamsHybrid();
-    const tournaments = await getTournamentsHybrid();
+    const teams = await getTeams();
     
-    // Enrich teams with tournament names
+    // Enrich teams with tournament names by fetching tournaments
+    const { getTournaments } = await import('@/lib/firebase-database');
+    const tournaments = await getTournaments();
+    
     const teamsWithTournamentNames = teams.map((team: any) => {
       const tournament = tournaments.find((t: any) => t.id === team.tournamentId);
       return {
@@ -35,33 +32,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing team data' }, { status: 400 });
     }
 
-    // Get existing teams
-    const teams = await getTeamsHybrid();
-    
-    // Check for duplicate team name in same tournament
-    const existingTeam = teams.find((t: any) => 
-      t.tournamentId === team.tournamentId && t.name.toLowerCase() === team.name.toLowerCase()
-    );
-
-    if (existingTeam) {
-      return NextResponse.json({ error: 'Team name already exists for this tournament' }, { status: 400 });
-    }
-
-    // Create new team with registration data
-    const newTeam = {
-      id: Date.now().toString(),
-      ...team,
-      registeredAt: new Date().toISOString(),
-      status: 'registered'
-    };
-
-    // Save team (Discord + LocalStorage backup)
-    teams.push(newTeam);
-    const saved = await saveTeamsHybrid(teams);
-
-    if (!saved) {
-      return NextResponse.json({ error: 'Failed to save team registration' }, { status: 500 });
-    }
+    // Register team using Firebase
+    const newTeam = await registerTeam(team);
 
     return NextResponse.json({ 
       success: true, 
@@ -71,6 +43,11 @@ export async function POST(request: Request) {
 
   } catch (error) {
     console.error('Error registering team:', error);
+    
+    if (error instanceof Error) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+    
     return NextResponse.json({ error: 'Failed to register team' }, { status: 500 });
   }
 }

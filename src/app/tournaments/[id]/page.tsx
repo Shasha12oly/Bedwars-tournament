@@ -5,7 +5,7 @@ import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import BottomNav from '@/components/BottomNav';
-import { getTournament, getTeams, getTeamCount } from '@/lib/database';
+import { getTournament, getTeams, getTeamCount } from '@/lib/firebase-database';
 
 interface Tournament {
   id: string;
@@ -44,35 +44,24 @@ export default function TournamentDetails({ params, searchParams }: {
         const tournamentId = resolvedParams.id;
         console.log('Loading tournament details for ID:', tournamentId);
         
-        // Get teams data from server API
-        const [teamsResponse, tournamentsResponse] = await Promise.all([
-          fetch('/api/teams'),
-          fetch('/api/tournaments')
+        // Get tournament and teams from Firebase
+        const [tournamentData, teamsData] = await Promise.all([
+          getTournament(tournamentId),
+          getTeams(tournamentId)
         ]);
         
-        const allTeams = await teamsResponse.json();
-        const allTournaments = await tournamentsResponse.json();
-        
-        const tournamentData = allTournaments.find((t: any) => t.id === tournamentId);
-        const teamsData = allTeams.filter((team: any) => team.tournamentId === tournamentId);
-        const teamCount = teamsData.length;
-        
-        console.log('Tournament data:', tournamentData);
-        console.log('Teams data:', teamsData, 'Count:', teamCount);
-        
-        if (!tournamentData) {
-          console.log('Tournament not found in database');
-          setLoading(false);
-          return;
+        if (tournamentData) {
+          const teamCount = await getTeamCount(tournamentId);
+          setTournament({
+            ...tournamentData,
+            slots: tournamentData.maxSlots,
+            registered: teamCount,
+            status: teamCount >= tournamentData.maxSlots ? 'closed' : tournamentData.status
+          });
+          setTeams(teamsData);
+        } else {
+          console.error('Tournament not found');
         }
-        
-        setTournament({
-          ...tournamentData,
-          registered: teamCount,
-          slots: tournamentData.maxSlots,
-          status: teamCount >= tournamentData.maxSlots ? 'closed' : tournamentData.status
-        });
-        setTeams(teamsData);
       } catch (error) {
         console.error('Error loading tournament data:', error);
       } finally {

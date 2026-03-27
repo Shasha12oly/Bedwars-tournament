@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { mentionForUsernameInGuild } from '@/lib/discord-mentions';
-import { getTeamCountFromFile } from '@/lib/file-storage';
+import { getTeamCount } from '@/lib/firebase-database';
 
 // Discord Gateway connection for "online" status
 let gatewayWs: WebSocket | null = null;
@@ -244,11 +244,11 @@ export async function POST(req: Request) {
     
     // Create member list with only IGNs (no Discord usernames in list)
     const memberList = members.map((member: string, index: number) => {
-      return `${pingMentions[index]} (${member})`;
+      return `${member}`;
     }).join('\n');
 
-    // Get current team count for registration progress (this is the new team being registered)
-    const currentTeams = await getTeamCountFromFile(tournament.id);
+    // Get current team count for registration progress (this is new team being registered)
+    const currentTeams = await getTeamCount(tournament.id);
     const maxSlots = tournament.maxSlots || 16; // Default to 16 if not specified
     
     const embed = {

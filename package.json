@@ -1,15 +1,29 @@
 {
   "name": "bedwars-tournament",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "next lint",
+    "lint:fix": "next lint --fix",
+    "type-check": "tsc --noEmit",
+    "build:analyze": "ANALYZE=true next build",
+    "build:production": "next build && next export",
+    "deploy:render": "npm run build && npm run start",
+    "health-check": "curl -f http://localhost:3000/api/health || exit 1",
+    "test:mobile": "npm run build && npm run start & sleep 5 && npx lighthouse http://localhost:3000 --chrome-flags='--headless' --output=html --output-path=./lighthouse-report.html",
+    "optimize": "npm run build && npm run lint:fix && npm run type-check",
+    "preview": "npm run build && npm run start"
   },
   "dependencies": {
+    "firebase": "^12.11.0",
     "next": "16.2.1",
     "react": "19.2.4",
     "react-dom": "19.2.4"

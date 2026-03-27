@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
-import { getTournament, registerTeam, getTeams, getTeamCount } from '@/lib/database';
+import { getTournament, registerTeam, getTeams, getTeamCount, updateTournament } from '@/lib/firebase-database';
 
 interface Tournament {
   id: string;
@@ -56,13 +56,17 @@ export default function TournamentRegister({ params }: { params: Promise<{ id: s
   useEffect(() => {
     const loadTournament = async () => {
       try {
-        // Get tournament data from server API
-        const tournamentsResponse = await fetch('/api/tournaments');
-        const tournaments = await tournamentsResponse.json();
-        const tournamentData = tournaments.find((t: any) => t.id === resolvedParams.id);
+        // Get tournament data from Firebase
+        const tournamentData = await getTournament(resolvedParams.id);
         
         if (tournamentData) {
-          setTournament(tournamentData);
+          // Get current team count
+          const teamCount = await getTeamCount(resolvedParams.id);
+          setTournament({
+            ...tournamentData,
+            slots: tournamentData.maxSlots,
+            registered: teamCount
+          });
         } else {
           router.push('/tournaments');
         }
@@ -103,48 +107,67 @@ export default function TournamentRegister({ params }: { params: Promise<{ id: s
     setError('');
     
     try {
-      // Get tournament data from server
-      const tournamentsResponse = await fetch('/api/tournaments');
-      const tournaments = await tournamentsResponse.json();
-      const tournament = tournaments.find((t: any) => t.id === resolvedParams.id);
+      // Get tournament data from Firebase
+      const tournament = await getTournament(resolvedParams.id);
 
       if (!tournament) {
         setError('Tournament not found');
         return;
       }
 
-      // Prepare team data
+      // Prepare team data for Firebase
       const teamData = {
         name: formData.teamName.trim(),
         captain: formData.minecraftIGN.trim(),
         members: [formData.minecraftIGN.trim(), ...formData.teammates.filter(t => t.trim())],
-        discordUsers: [formData.discord.trim(), ...formData.teammateDiscords.filter(d => d.trim())],
-        rewardReceiver: formData.rewardReceiver.trim() || formData.minecraftIGN.trim()
+        discord: formData.discord.trim(),
+        rewardReceiver: formData.rewardReceiver.trim() || formData.minecraftIGN.trim(),
+        tournamentId: resolvedParams.id,
+        status: 'registered' as const,
+        registeredAt: new Date().toISOString()
       };
 
-      // Register team via server API
-      const response = await fetch('/api/tournaments', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          tournament: tournament,
-          team: teamData
-        }),
-      });
+      // Register team via Firebase
+      const newTeam = await registerTeam(teamData);
 
-      const result = await response.json();
+      // Send Discord notification
+      try {
+        const discordResponse = await fetch('/api/discord/register', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            team: {
+              ...teamData,
+              discordUsers: [formData.discord.trim(), ...formData.teammateDiscords.filter(d => d.trim())]
+            },
+            tournament: tournament
+          })
+        });
 
-      if (!response.ok) {
-        if (response.status === 400 && result.error?.includes('already exists')) {
-          setError('A team with this name is already registered for this tournament');
-        } else if (response.status === 400 && result.error?.includes('full')) {
-          setError('This tournament is full');
+        if (!discordResponse.ok) {
+          console.error('Discord notification failed:', await discordResponse.text());
         } else {
-          setError(result.error || 'Registration failed');
+          console.log('Discord notification sent successfully');
         }
-        return;
+      } catch (discordError) {
+        console.error('Error sending Discord notification:', discordError);
+      }
+
+      // Check if tournament is now full and generate matches automatically
+      try {
+        const currentTeams = await getTeamCount(tournament.id);
+        if (currentTeams >= tournament.maxSlots) {
+          console.log('🎯 Tournament is full, closing registration automatically...');
+          
+          // Close registration
+          await updateTournament(tournament.id, { ...tournament, status: 'closed' });
+          
+          console.log('✅ Registration closed! Matches must be generated manually by admin.');
+        }
+      } catch (matchError) {
+        console.error('Error in automatic match generation:', matchError);
       }
 
       // Success - redirect to tournament page
@@ -152,7 +175,17 @@ export default function TournamentRegister({ params }: { params: Promise<{ id: s
 
     } catch (error) {
       console.error('Registration error:', error);
-      setError('Network error. Please try again.');
+      if (error instanceof Error) {
+        if (error.message.includes('already exists')) {
+          setError('A team with this name is already registered for this tournament');
+        } else if (error.message.includes('full')) {
+          setError('This tournament is full');
+        } else {
+          setError(error.message);
+        }
+      } else {
+        setError('Registration failed. Please try again.');
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -171,6 +204,10 @@ export default function TournamentRegister({ params }: { params: Promise<{ id: s
       setError('Captain Discord is required');
       return false;
     }
+    if (!tournament) {
+      setError('Tournament not loaded');
+      return false;
+    }
     if (tournament.format === 'Duo' && !formData.teammates[0].trim()) {
       setError('Teammate name is required');
       return false;
@@ -186,6 +223,7 @@ export default function TournamentRegister({ params }: { params: Promise<{ id: s
   };
 
   const getTeammateFields = () => {
+    if (!tournament) return null;
     if (tournament.format === 'Solo') return null;
     if (tournament.format === 'Duo') {
       return (
@@ -418,7 +456,7 @@ export default function TournamentRegister({ params }: { params: Promise<{ id: s
               ← Back to Tournament
             </Link>
             <h1 className="text-3xl font-bold text-white sm:text-4xl">Register for Tournament</h1>
-            <p className="mt-2 text-slate-400">Complete the form below to join {tournament.name}</p>
+            <p className="mt-2 text-slate-400">Complete form below to join {tournament?.name || 'Tournament'}</p>
           </section>
 
           {/* Tournament Info */}
@@ -427,20 +465,20 @@ export default function TournamentRegister({ params }: { params: Promise<{ id: s
             <div className="grid md:grid-cols-2 gap-4">
               <div>
                 <span className="text-sm text-slate-400">Tournament</span>
-                <p className="text-white font-medium">{tournament.name}</p>
+                <p className="text-white font-medium">{tournament?.name || 'Loading...'}</p>
               </div>
               <div>
                 <span className="text-sm text-slate-400">Format</span>
-                <p className="text-white font-medium">{tournament.format}</p>
+                <p className="text-white font-medium">{tournament?.format || 'Loading...'}</p>
               </div>
               <div>
                 <span className="text-sm text-slate-400">Date & Time</span>
-                <p className="text-white font-medium">{tournament.date} at {tournament.time}</p>
+                <p className="text-white font-medium">{tournament?.date || 'Loading...'} at {tournament?.time || 'Loading...'}</p>
               </div>
               <div>
                 <span className="text-sm text-slate-400 uppercase tracking-wider font-semibold">Prize Pool</span>
                 <div className="mt-2 space-y-1">
-                  {tournament.prizePool ? tournament.prizePool.split('\n').map((prize: string, index: number) => (
+                  {tournament?.prizePool ? tournament.prizePool.split('\n').map((prize: string, index: number) => (
                     <div key={index} className="flex items-start gap-2">
                       <span className="text-amber-400 text-xs mt-0.5">🏆</span>
                       <span className="text-emerald-400 font-medium text-sm">{prize.trim()}</span>
@@ -509,7 +547,7 @@ export default function TournamentRegister({ params }: { params: Promise<{ id: s
               </div>
 
               {/* Team Information */}
-              {tournament.format !== 'Solo' && (
+              {tournament?.format && tournament.format !== 'Solo' && (
                 <div>
                   <h3 className="text-lg font-medium text-white mb-4">Team Information</h3>
                   <div className="space-y-4">
@@ -545,12 +583,12 @@ export default function TournamentRegister({ params }: { params: Promise<{ id: s
                 <h3 className="text-lg font-medium text-white mb-4">Tournament Rules</h3>
                 <div className="bg-white/5 rounded-lg p-4 mb-4">
                   <ul className="space-y-2 text-sm text-slate-300">
-                    {tournament.rules.map((rule: string, index: number) => (
+                    {tournament?.rules?.map((rule: string, index: number) => (
                       <li key={index} className="flex items-start gap-2">
                         <span className="text-emerald-400 mt-0.5">•</span>
                         {rule}
                       </li>
-                    ))}
+                    )) || <li className="text-slate-400">Loading rules...</li>}
                   </ul>
                 </div>
                 <label className="flex items-start gap-3">

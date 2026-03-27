@@ -7,6 +7,7 @@ import BottomNav from '@/components/BottomNav';
 
 export default function MessageSender() {
   const [channelId, setChannelId] = useState('');
+  const [title, setTitle] = useState('');
   const [message, setMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
@@ -25,7 +26,7 @@ export default function MessageSender() {
 
   const sendMessage = async () => {
     if (!channelId.trim() || !message.trim()) {
-      setStatus('❌ Please fill in both channel ID and message');
+      setStatus('❌ Please fill in channel ID and message');
       return;
     }
 
@@ -41,6 +42,7 @@ export default function MessageSender() {
         },
         body: JSON.stringify({
           channelId: channelId.trim(),
+          title: title.trim(),
           message: message.trim(),
         }),
       });
@@ -102,6 +104,23 @@ export default function MessageSender() {
                 </p>
               </div>
 
+              {/* Title */}
+              <div>
+                <label className="block text-sm font-medium text-slate-400 mb-2">
+                  Message Title
+                </label>
+                <input
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent"
+                  placeholder="Enter message title (optional)"
+                />
+                <p className="text-xs text-slate-500 mt-1">
+                  Optional title for your message (will be shown as embed title)
+                </p>
+              </div>
+
               {/* Message */}
               <div>
                 <label className="block text-sm font-medium text-slate-400 mb-2">
@@ -132,6 +151,7 @@ export default function MessageSender() {
                 <button
                   onClick={() => {
                     setChannelId('');
+                    setTitle('');
                     setMessage('');
                     setStatus('Form cleared');
                     setTimeout(() => setStatus(''), 2000);
@@ -191,11 +211,17 @@ export default function MessageSender() {
               <div className="flex items-start gap-3">
                 <span className="text-emerald-400 mt-0.5">2.</span>
                 <div>
-                  <strong className="text-white">Write Your Message:</strong> You can use Discord markdown, emojis, and formatting. The message will be sent in a beautiful embed format.
+                  <strong className="text-white">Add Title (Optional):</strong> Enter a catchy title for your message. This will appear as the embed title in Discord and helps grab attention.
                 </div>
               </div>
               <div className="flex items-start gap-3">
                 <span className="text-emerald-400 mt-0.5">3.</span>
+                <div>
+                  <strong className="text-white">Write Your Message:</strong> You can use Discord markdown, emojis, and formatting. The message will be sent in a beautiful embed format.
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <span className="text-emerald-400 mt-0.5">4.</span>
                 <div>
                   <strong className="text-white">Send Message:</strong> Click the send button and watch the logs to see the real-time status of your message delivery.
                 </div>
@@ -205,6 +231,7 @@ export default function MessageSender() {
             <div className="mt-6 p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
               <h3 className="text-emerald-400 font-medium mb-2">💡 Pro Tips</h3>
               <ul className="text-sm text-slate-300 space-y-1">
+                <li>• Use catchy titles like "🏆 Tournament Winner!" or "⚔️ Match Schedule"</li>
                 <li>• Use **bold** for emphasis and *italics* for style</li>
                 <li>• Add emojis to make your messages more engaging 🎉🏆⚔️</li>
                 <li>• Use line breaks to structure longer messages</li>

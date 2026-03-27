@@ -8,18 +8,19 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: 'Missing DISCORD_BOT_TOKEN' }, { status: 500 });
     }
 
-    const { channelId, message } = await req.json();
+    const { channelId, title, message } = await req.json();
 
     if (!channelId || !message) {
       return NextResponse.json({ ok: false, error: 'Missing channelId or message' }, { status: 400 });
     }
 
     console.log('📨 Sending custom message to Discord channel:', channelId);
+    console.log('📝 Message title:', title || 'No title');
     console.log('📝 Message content:', message.substring(0, 200));
 
     // Create a beautiful embed for the message
     const embed = {
-      title: '📨 Announcement',
+      title: title || '📨 Announcement', // Use custom title or fallback
       description: message,
       color: 0x00ff00,
       timestamp: new Date().toISOString(),

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import BottomNav from '@/components/BottomNav';
+import { getTournaments, getTeams, getTeamCount } from '@/lib/firebase-database';
 
 interface Tournament {
   id: string;
@@ -15,9 +16,12 @@ interface Tournament {
   format: string;
   maxSlots: number;
   currentTeams: number;
-  prizePool: string;
-  rules: string[];
-  schedule: { time: string; event: string }[];
+  slots: number;
+  prizePool?: string;
+  prize?: string;
+  description?: string;
+  rules?: string[];
+  schedule?: { time: string; event: string }[];
   winner?: string;
 }
 
@@ -32,11 +36,23 @@ const getFormatIcon = (format: string) => {
 
 const getStatusColor = (status: string) => {
   switch (status) {
-    case 'live': return 'bg-red-500/20 text-red-400';
-    case 'upcoming': return 'bg-amber-500/20 text-amber-400';
-    case 'completed': return 'bg-emerald-500/20 text-emerald-400';
-    case 'closed': return 'bg-slate-500/20 text-slate-400';
+    case 'open': return 'bg-emerald-500/20 text-emerald-400';
+    case 'closed': return 'bg-red-500/20 text-red-400';
+    case 'matches_generated': return 'bg-amber-500/20 text-amber-400';
+    case 'in_progress': return 'bg-blue-500/20 text-blue-400';
+    case 'completed': return 'bg-purple-500/20 text-purple-400';
     default: return 'bg-slate-500/20 text-slate-400';
+  }
+};
+
+const getStatusText = (status: string) => {
+  switch (status) {
+    case 'open': return 'Open';
+    case 'closed': return 'Closed';
+    case 'matches_generated': return 'Matches Generated';
+    case 'in_progress': return 'In Progress';
+    case 'completed': return 'Completed';
+    default: return 'Unknown';
   }
 };
 
@@ -48,14 +64,71 @@ export default function TournamentsPage() {
   const loadTournaments = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/tournaments');
-      const data = await response.json();
       
-      if (response.ok) {
-        setTournaments(data);
-      } else {
-        console.error('Failed to load tournaments:', data);
-      }
+      // Load tournaments from Firebase
+      const tournamentsData = await getTournaments();
+      
+      // Get team counts for each tournament
+      const tournamentsWithCounts = await Promise.all(
+        tournamentsData.map(async (tournament) => {
+          const teamCount = await getTeamCount(tournament.id || '');
+          
+          // Get matches to check if they exist
+          const { getMatches } = await import('@/lib/firebase-database');
+          const matchesData = await getMatches(tournament.id || '');
+          const hasMatches = matchesData.length > 0;
+          
+          // Check if tournament is completed (has winner)
+          const isCompleted = !!tournament.winner;
+          
+          // Determine correct status based on ACTUAL conditions (not stored status)
+          let correctStatus: 'open' | 'closed' | 'matches_generated' | 'completed';
+          
+          if (isCompleted) {
+            // Has winner = Completed (highest priority)
+            correctStatus = 'completed';
+          } else if (teamCount < 16) {
+            // Less than 16 teams = Open for registration
+            correctStatus = 'open';
+          } else if (teamCount >= 16 && !hasMatches) {
+            // 16 teams, no matches = Closed (registration full, matches not generated)
+            correctStatus = 'closed';
+          } else if (teamCount >= 16 && hasMatches) {
+            // 16 teams, has matches = Matches Generated
+            correctStatus = 'matches_generated';
+          } else {
+            // Default fallback
+            correctStatus = 'open';
+          }
+          
+          console.log(`🔍 Tournament Status Check:`, {
+            name: tournament.name,
+            teamCount: `${teamCount}/16`,
+            hasMatches: hasMatches,
+            isCompleted: isCompleted,
+            oldStatus: tournament.status,
+            newStatus: correctStatus
+          });
+          
+          // Update tournament in database if status is wrong
+          if (correctStatus !== tournament.status && tournament.id) {
+            const { updateDoc, doc } = await import('firebase/firestore');
+            const { db } = await import('@/lib/firebase');
+            const tournamentRef = doc(db, 'tournaments', tournament.id);
+            await updateDoc(tournamentRef, { status: correctStatus });
+            console.log(`✅ Corrected tournament status from ${tournament.status} to ${correctStatus}`);
+          }
+          
+          return {
+            ...tournament,
+            status: correctStatus,
+            currentTeams: teamCount,
+            slots: tournament.maxSlots
+          } as unknown as Tournament;
+        })
+      );
+      
+      setTournaments(tournamentsWithCounts);
     } catch (error) {
       console.error('Error loading tournaments:', error);
     } finally {
@@ -142,7 +215,7 @@ export default function TournamentsPage() {
                     </div>
                   </div>
                   <div className={`px-3 py-1 rounded-full text-xs font-bold ${getStatusColor(tournament.status)}`}>
-                    {tournament.status}
+                    {getStatusText(tournament.status)}
                   </div>
                 </div>
 
@@ -176,7 +249,9 @@ export default function TournamentsPage() {
                 <div className="flex items-center justify-between">
                   <span className="text-emerald-400 text-sm font-medium">
                     {tournament.status === 'completed' ? 'View Results' : 
-                     tournament.status === 'live' ? 'Watch Live' : 
+                     tournament.status === 'in_progress' ? 'View Matches' : 
+                     tournament.status === 'matches_generated' ? 'View Matches' :
+                     tournament.status === 'closed' ? 'Registration Closed' : 
                      tournament.currentTeams >= tournament.maxSlots ? 'Tournament Full' : 'Register Now'}
                   </span>
                   <div className="text-emerald-400 group-hover:translate-x-1 transition-transform">
