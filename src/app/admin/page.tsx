@@ -585,24 +585,12 @@ export default function AdminDashboard() {
     }
   };
 
-const updateNextRoundMatches = async (completedMatch: Match, winner: string, currentMatches: Match[]) => {
-    try {
-      const roundOrder = ['Round of 16', 'Quarterfinals', 'Semifinals', 'Finals'];
-      const currentRoundIndex = roundOrder.indexOf(completedMatch.round);
-      const nextRound = roundOrder[currentRoundIndex + 1];
-      
-      console.log(`🏆 Updating next round: ${completedMatch.round} → ${nextRound}`);
-      console.log(`🏆 Winner: ${winner} from match ${completedMatch.id}`);
-      
-      if (!nextRound) return;
-
-    // Find the current match index in its round to determine which next round slot to fill
+const updateNextRoundMatches = async (completedMatch: Match, winner: string) => {
     const currentRoundMatches = currentMatches.filter(m => m.round === completedMatch.round);
     const currentMatchIndex = currentRoundMatches.findIndex(m => m.id === completedMatch.id);
     
     console.log(`📊 Current round matches: ${currentRoundMatches.length}`);
     console.log(`📊 Current match index: ${currentMatchIndex}`);
-    console.log(`📊 Current round matches:`, currentRoundMatches.map(m => ({id: m.id, player1: m.player1, player2: m.player2})));
     
     // Calculate which slot in next round this winner should fill
     const nextRoundSlotIndex = Math.floor(currentMatchIndex / 2);
@@ -616,24 +604,6 @@ const updateNextRoundMatches = async (completedMatch: Match, winner: string, cur
     console.log(`🎯 Target match:`, targetMatch ? {id: targetMatch.id, player1: targetMatch.player1, player2: targetMatch.player2} : 'Not found');
     
     if (targetMatch) {
-      try {
-        // Update the specific match in database
-        // Find the current match to update
-        const currentMatch = currentMatches.find(m => m.id === targetMatch.id);
-        
-        if (currentMatch) {
-          const updateData: any = {};
-          
-          // Fill the first available slot (player1 or player2)
-          if (currentMatch.player1 === 'TBD') {
-            updateData.player1 = winner;
-            console.log(`✅ Updated ${targetMatch.id}.player1 = ${winner}`);
-          } else if (currentMatch.player2 === 'TBD') {
-            updateData.player2 = winner;
-            console.log(`✅ Updated ${targetMatch.id}.player2 = ${winner}`);
-          }
-          
-          if (targetMatch) {
       try {
         // Update the specific match in database
         // Find the current match to update
@@ -1152,4 +1122,4 @@ const syncMatches = async () => {
       <Footer />
     </div>
   );
-}
+};
