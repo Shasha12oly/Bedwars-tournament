@@ -365,7 +365,10 @@ export default function TournamentDetails({ params, searchParams }: {
                         <div className="flex items-center gap-2">
                           <span className="text-slate-400">Registered:</span>
                           <span className="text-slate-300">
-                            {new Date(team.registeredAt).toLocaleDateString()}
+                            {team.registeredAt?.toDate ? 
+                              team.registeredAt.toDate().toLocaleDateString() :
+                              new Date(team.registeredAt).toLocaleDateString()
+                            }
                           </span>
                         </div>
                       </div>

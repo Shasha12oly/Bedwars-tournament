@@ -161,8 +161,7 @@ export async function registerTeam(teamData: Omit<Team, 'id' | 'registeredAt'>):
     const docRef = await addDoc(collection(db, TEAMS_COLLECTION), newTeam);
     return {
       id: docRef.id,
-      ...newTeam,
-      registeredAt: newTeam.registeredAt.toString()
+      ...newTeam
     };
   } catch (error) {
     console.error('Error registering team:', error);
