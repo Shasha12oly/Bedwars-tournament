@@ -209,24 +209,24 @@ export default function AdminDashboard() {
       // Create initial matches structure
       const initialMatches: Match[] = [
         // Round of 16
-        { id: 'match-1', tournamentId, round: 'Round of 16', player1: 'TBD', player2: 'TBD', status: 'upcoming', scheduledTime: '2024-01-15T14:00:00Z' },
-        { id: 'match-2', tournamentId, round: 'Round of 16', player1: 'TBD', player2: 'TBD', status: 'upcoming', scheduledTime: '2024-01-15T14:30:00Z' },
-        { id: 'match-3', tournamentId, round: 'Round of 16', player1: 'TBD', player2: 'TBD', status: 'upcoming', scheduledTime: '2024-01-15T15:00:00Z' },
-        { id: 'match-4', tournamentId, round: 'Round of 16', player1: 'TBD', player2: 'TBD', status: 'upcoming', scheduledTime: '2024-01-15T15:30:00Z' },
-        { id: 'match-5', tournamentId, round: 'Round of 16', player1: 'TBD', player2: 'TBD', status: 'upcoming', scheduledTime: '2024-01-15T16:00:00Z' },
-        { id: 'match-6', tournamentId, round: 'Round of 16', player1: 'TBD', player2: 'TBD', status: 'upcoming', scheduledTime: '2024-01-15T16:30:00Z' },
-        { id: 'match-7', tournamentId, round: 'Round of 16', player1: 'TBD', player2: 'TBD', status: 'upcoming', scheduledTime: '2024-01-15T17:00:00Z' },
-        { id: 'match-8', tournamentId, round: 'Round of 16', player1: 'TBD', player2: 'TBD', status: 'upcoming', scheduledTime: '2024-01-15T17:30:00Z' },
+        { id: 'match-1', tournamentId, round: 'Round of 16', player1: 'TBD', player2: 'TBD', status: 'upcoming', result: null, scheduledTime: '2024-01-15T14:00:00Z' },
+        { id: 'match-2', tournamentId, round: 'Round of 16', player1: 'TBD', player2: 'TBD', status: 'upcoming', result: null, scheduledTime: '2024-01-15T14:30:00Z' },
+        { id: 'match-3', tournamentId, round: 'Round of 16', player1: 'TBD', player2: 'TBD', status: 'upcoming', result: null, scheduledTime: '2024-01-15T15:00:00Z' },
+        { id: 'match-4', tournamentId, round: 'Round of 16', player1: 'TBD', player2: 'TBD', status: 'upcoming', result: null, scheduledTime: '2024-01-15T15:30:00Z' },
+        { id: 'match-5', tournamentId, round: 'Round of 16', player1: 'TBD', player2: 'TBD', status: 'upcoming', result: null, scheduledTime: '2024-01-15T16:00:00Z' },
+        { id: 'match-6', tournamentId, round: 'Round of 16', player1: 'TBD', player2: 'TBD', status: 'upcoming', result: null, scheduledTime: '2024-01-15T16:30:00Z' },
+        { id: 'match-7', tournamentId, round: 'Round of 16', player1: 'TBD', player2: 'TBD', status: 'upcoming', result: null, scheduledTime: '2024-01-15T17:00:00Z' },
+        { id: 'match-8', tournamentId, round: 'Round of 16', player1: 'TBD', player2: 'TBD', status: 'upcoming', result: null, scheduledTime: '2024-01-15T17:30:00Z' },
         // Quarterfinals
-        { id: 'match-9', tournamentId, round: 'Quarterfinals', player1: 'Winner Match 1', player2: 'Winner Match 2', status: 'upcoming', scheduledTime: '2024-01-15T18:00:00Z' },
-        { id: 'match-10', tournamentId, round: 'Quarterfinals', player1: 'Winner Match 3', player2: 'Winner Match 4', status: 'upcoming', scheduledTime: '2024-01-15T18:30:00Z' },
-        { id: 'match-11', tournamentId, round: 'Quarterfinals', player1: 'Winner Match 5', player2: 'Winner Match 6', status: 'upcoming', scheduledTime: '2024-01-15T19:00:00Z' },
-        { id: 'match-12', tournamentId, round: 'Quarterfinals', player1: 'Winner Match 7', player2: 'Winner Match 8', status: 'upcoming', scheduledTime: '2024-01-15T19:30:00Z' },
+        { id: 'match-9', tournamentId, round: 'Quarterfinals', player1: 'Winner Match 1', player2: 'Winner Match 2', status: 'upcoming', result: null, scheduledTime: '2024-01-15T18:00:00Z' },
+        { id: 'match-10', tournamentId, round: 'Quarterfinals', player1: 'Winner Match 3', player2: 'Winner Match 4', status: 'upcoming', result: null, scheduledTime: '2024-01-15T18:30:00Z' },
+        { id: 'match-11', tournamentId, round: 'Quarterfinals', player1: 'Winner Match 5', player2: 'Winner Match 6', status: 'upcoming', result: null, scheduledTime: '2024-01-15T19:00:00Z' },
+        { id: 'match-12', tournamentId, round: 'Quarterfinals', player1: 'Winner Match 7', player2: 'Winner Match 8', status: 'upcoming', result: null, scheduledTime: '2024-01-15T19:30:00Z' },
         // Semifinals
-        { id: 'match-13', tournamentId, round: 'Semifinals', player1: 'Winner Match 9', player2: 'Winner Match 10', status: 'upcoming', scheduledTime: '2024-01-15T20:00:00Z' },
-        { id: 'match-14', tournamentId, round: 'Semifinals', player1: 'Winner Match 11', player2: 'Winner Match 12', status: 'upcoming', scheduledTime: '2024-01-15T20:30:00Z' },
+        { id: 'match-13', tournamentId, round: 'Semifinals', player1: 'Winner Match 13', player2: 'Winner Match 10', status: 'upcoming', result: null, scheduledTime: '2024-01-15T20:00:00Z' },
+        { id: 'match-14', tournamentId, round: 'Semifinals', player1: 'Winner Match 11', player2: 'Winner Match 12', status: 'upcoming', result: null, scheduledTime: '2024-01-15T20:30:00Z' },
         // Finals
-        { id: 'match-15', tournamentId, round: 'Finals', player1: 'Winner Match 13', player2: 'Winner Match 14', status: 'upcoming', scheduledTime: '2024-01-15T21:00:00Z' }
+        { id: 'match-15', tournamentId, round: 'Finals', player1: 'Winner Match 13', player2: 'Winner Match 14', status: 'upcoming', result: null, scheduledTime: '2024-01-15T21:00:00Z' }
       ];
 
       await updateMatches(initialMatches);
