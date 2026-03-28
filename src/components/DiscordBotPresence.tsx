@@ -61,23 +61,27 @@ export default function DiscordBotPresence() {
       };
 
       ws.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        
-        if (data.op === 10) { // Hello
-          // Start heartbeat
-          const heartbeatInterval = data.d.heartbeat_interval;
-          startHeartbeat(ws, heartbeatInterval);
-          console.log('💓 Started heartbeat with interval:', heartbeatInterval);
-        }
-        
-        if (data.op === 0) { // Ready
-          console.log('🤖 Bot is ready and online!');
-          console.log('📝 Bot username:', data.d.user.username);
-          console.log('🟢 Bot status should now show as online');
-        }
-        
-        if (data.op === 11) { // Heartbeat ACK
-          console.log('💓 Heartbeat acknowledged');
+        try {
+          const data = JSON.parse(event.data);
+          
+          if (data.op === 10) { // Hello
+            // Start heartbeat
+            const heartbeatInterval = data.d.heartbeat_interval;
+            startHeartbeat(ws, heartbeatInterval);
+            console.log('💓 Started heartbeat with interval:', heartbeatInterval);
+          }
+          
+          if (data.op === 0) { // Ready
+            console.log('🤖 Bot is ready and online!');
+            console.log('📝 Bot username:', data.d.user?.username || 'Unknown');
+            console.log('🟢 Bot status should now show as online');
+          }
+          
+          if (data.op === 11) { // Heartbeat ACK
+            console.log('💓 Heartbeat acknowledged');
+          }
+        } catch (error) {
+          console.error('❌ Error parsing WebSocket message:', error);
         }
       };
 
