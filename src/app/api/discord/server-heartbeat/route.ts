@@ -57,7 +57,7 @@ function initializeWebSocket() {
     
     if (data.op === 0) { // Ready
       console.log('🤖 Server-side bot is ready and online!');
-      console.log('📝 Bot username:', data.d.user.username);
+      console.log('📝 Bot username:', data.d.user?.username || 'Unknown');
       console.log('🟢 Bot status should now show as online with "Made by Sharmagaming"');
     }
     

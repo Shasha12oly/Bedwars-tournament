@@ -138,6 +138,22 @@ function startHeartbeat() {
 export async function POST(req: Request) {
   console.log('🚀 Discord registration webhook triggered');
   
+  // Helper function to convert number to ordinal (1st, 2nd, 3rd, 4th, etc.)
+  const getOrdinalNumber = (num: number): string => {
+    const j = num % 10;
+    const k = num % 100;
+    if (j === 1 && k !== 11) {
+      return `${num}st`;
+    }
+    if (j === 2 && k !== 12) {
+      return `${num}nd`;
+    }
+    if (j === 3 && k !== 13) {
+      return `${num}rd`;
+    }
+    return `${num}th`;
+  };
+  
   try {
     const botToken = process.env.DISCORD_BOT_TOKEN;
     const channelId = process.env.DISCORD_CHANNEL_ID;
@@ -244,32 +260,41 @@ export async function POST(req: Request) {
     
     // Create member list with only IGNs (no Discord usernames in list)
     const memberList = members.map((member: string, index: number) => {
-      return `${member}`;
+      const sequence = index === 0 ? `👑 Captain` : `👤 Teammate ${index}`;
+      return `${sequence}: ${member}`;
     }).join('\n');
 
     // Get current team count for registration progress (this is new team being registered)
     const currentTeams = await getTeamCount(tournament.id);
     const maxSlots = tournament.maxSlots || 16; // Default to 16 if not specified
     
+    // Get registration sequence - use the team's stored sequence or current team count
+    const registrationSequence = team.registrationSequence || currentTeams;
+    const sequenceDisplay = getOrdinalNumber(registrationSequence);
+    
+    // For resend notifications, use the team's actual registration sequence for progress
+    const progressDisplay = `${registrationSequence}/${maxSlots} teams registered`;
+    
     const embed = {
-      title: '🎮 New Team Registration!',
+      title: `🎮 ${sequenceDisplay} Team Registration!`,
       color: 0x00ff00,
       description: `**👥 Team Members:**\n${memberList}`,
       fields: [
         { name: '🏆 Tournament', value: String(tournament.name ?? 'Unknown'), inline: true },
         { name: '👥 Team Name', value: String(team.name ?? 'Unknown'), inline: true },
+        { name: '🔢 Registration Order', value: `${sequenceDisplay} Team`, inline: true },
         { name: '👑 Captain', value: `${pingMentions[0]} (${String(team.captain ?? 'Unknown')})`, inline: true },
         { name: '🔗 Captain Discord', value: String(discordUsers[0] ?? 'Unknown'), inline: true },
-        { name: '📊 Registration Progress', value: `${currentTeams}/${maxSlots} teams registered`, inline: true },
-        { name: '📅 Registered At', value: team.registeredAt ? new Date(team.registeredAt).toLocaleString() : new Date().toLocaleString(), inline: true },
+        { name: '📊 Registration Progress', value: progressDisplay, inline: true },
+        { name: '📅 Registered At', value: team.registeredAt ? (new Date(team.registeredAt).toString() !== 'Invalid Date' ? new Date(team.registeredAt).toLocaleString() : 'Unknown') : new Date().toLocaleString(), inline: true },
         { name: '🎯 Reward Receiver', value: rewardReceiverMention ?? (team.rewardReceiver === 'captain' ? `@${team.captain}` : `@${team.rewardReceiver}`), inline: true },
       ],
       timestamp: new Date().toISOString(),
       footer: { text: '⚔️ BedWars Tournament Bot made by Sharmagaming' },
     };
 
-    // Add beautiful content with pings
-    const content = `🎮 **New Team Registration!** 🎉\n\n${pingMentions.join(' ')} - Your team **${team.name}** has been successfully registered for **${tournament.name}**! 🏆\n\n📊 **Registration Progress:** ${currentTeams}/${maxSlots} teams registered`;
+    // Simplified content without duplicate information
+    const content = `🎮 **${sequenceDisplay} Team Registration!** 🎉\n\n${pingMentions.join(' ')} - Your team **${team.name}** has been successfully registered as the **${sequenceDisplay} team** for **${tournament.name}**! 🏆\n\n📊 **Registration Progress:** ${progressDisplay}`;
 
     console.log('📝 Sending Discord message with data:', {
       content: content.substring(0, 200),

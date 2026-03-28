@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
-import { getTournament, registerTeam, getTeams, getTeamCount, updateTournament } from '@/lib/firebase-database';
+import { getTournament, getTeamCount, registerTeam, getNextRegistrationSequence, updateTournament } from '@/lib/firebase-database';
 
 interface Tournament {
   id: string;
@@ -116,15 +116,20 @@ export default function TournamentRegister({ params }: { params: Promise<{ id: s
       }
 
       // Prepare team data for Firebase
+      // Get next registration sequence
+      const nextSequence = await getNextRegistrationSequence(resolvedParams.id);
+      
       const teamData = {
         name: formData.teamName.trim(),
         captain: formData.minecraftIGN.trim(),
         members: [formData.minecraftIGN.trim(), ...formData.teammates.filter(t => t.trim())],
         discord: formData.discord.trim(),
+        memberDiscords: [formData.discord.trim(), ...formData.teammateDiscords.filter(d => d.trim())], // Store all Discord usernames
         rewardReceiver: formData.rewardReceiver.trim() || formData.minecraftIGN.trim(),
         tournamentId: resolvedParams.id,
         status: 'registered' as const,
-        registeredAt: new Date().toISOString()
+        registeredAt: new Date().toISOString(),
+        registrationSequence: nextSequence // Add registration sequence
       };
 
       // Register team via Firebase

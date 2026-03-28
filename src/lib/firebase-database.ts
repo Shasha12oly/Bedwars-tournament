@@ -23,10 +23,12 @@ export interface Team {
   captain: string;
   members: string[];
   discord: string;
+  memberDiscords?: string[]; // Store individual Discord usernames for each member
   rewardReceiver?: string;
   status: 'confirmed' | 'pending' | 'registered';
   tournamentId: string;
   registeredAt: string | Timestamp;
+  registrationSequence?: number; // Order of registration (1st, 2nd, 3rd, etc.)
 }
 
 export interface Match {
@@ -126,6 +128,28 @@ export async function getTeamCount(tournamentId: string): Promise<number> {
   } catch (error) {
     console.error('Error getting team count:', error);
     return 0;
+  }
+}
+
+export async function getNextRegistrationSequence(tournamentId: string): Promise<number> {
+  try {
+    const teamsRef = collection(db, TEAMS_COLLECTION);
+    const q = query(teamsRef, where('tournamentId', '==', tournamentId));
+    const querySnapshot = await getDocs(q);
+    
+    // Get the highest sequence number from all teams in this tournament
+    let maxSequence = 0;
+    querySnapshot.forEach(doc => {
+      const sequence = doc.data().registrationSequence;
+      if (sequence && typeof sequence === 'number' && sequence > maxSequence) {
+        maxSequence = sequence;
+      }
+    });
+    
+    return maxSequence + 1; // Next sequence number
+  } catch (error) {
+    console.error('Error getting next registration sequence:', error);
+    return 1; // Default to 1 if there's an error
   }
 }
 

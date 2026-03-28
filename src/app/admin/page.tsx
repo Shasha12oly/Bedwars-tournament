@@ -33,6 +33,12 @@ export default function AdminDashboard() {
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
   const [winner, setWinner] = useState('');
   const [tournament, setTournament] = useState<any>(null);
+  const [teams, setTeams] = useState<any[]>([]);
+  const [isResendingDiscord, setIsResendingDiscord] = useState(false);
+  const [editingTeamDiscord, setEditingTeamDiscord] = useState<string | null>(null);
+  const [tempDiscordData, setTempDiscordData] = useState<string[]>([]);
+  const [editingSequence, setEditingSequence] = useState<string | null>(null);
+  const [sequenceMode, setSequenceMode] = useState<'manual' | 'auto'>('auto');
 
   // Generate random team names
   const generateRandomTeamNames = () => {
@@ -166,6 +172,11 @@ export default function AdminDashboard() {
         captain: `Player${index + 1}`,
         members: [`Player${index + 1}`, `Player${index + 2}`, `Player${index + 3}`],
         discord: `user${index + 1}#${Math.floor(Math.random() * 9999).toString().padStart(4, '0')}`,
+        memberDiscords: [
+          `user${index + 1}#${Math.floor(Math.random() * 9999).toString().padStart(4, '0')}`,
+          `user${index + 2}#${Math.floor(Math.random() * 9999).toString().padStart(4, '0')}`,
+          `user${index + 3}#${Math.floor(Math.random() * 9999).toString().padStart(4, '0')}`
+        ],
         rewardReceiver: `Player${index + 1}`,
         tournamentId: tournamentId,
         status: 'registered' as const,
@@ -382,6 +393,249 @@ export default function AdminDashboard() {
     }
   };
 
+  // Auto-assign sequence numbers to all teams
+  const autoAssignSequences = async () => {
+    if (!confirm('Auto-assign registration sequences to all teams? This will number teams based on their registration time.')) {
+      return;
+    }
+    
+    try {
+      const { updateTeam } = await import('@/lib/firebase-database');
+      
+      // Sort teams by registration time
+      const sortedTeams = [...teams].sort((a, b) => {
+        const dateA = new Date(a.registeredAt).getTime();
+        const dateB = new Date(b.registeredAt).getTime();
+        return dateA - dateB;
+      });
+      
+      // Update each team with sequence number
+      for (let i = 0; i < sortedTeams.length; i++) {
+        const team = sortedTeams[i];
+        await updateTeam(team.id, {
+          registrationSequence: i + 1
+        });
+      }
+      
+      // Refresh teams data
+      const { getTeams } = await import('@/lib/firebase-database');
+      const tournamentId = tournament?.id || 'pYKa4M27SfgwxGoAYPRs';
+      const updatedTeams = await getTeams(tournamentId);
+      setTeams(updatedTeams);
+      
+      alert(`✅ Auto-assigned sequences to ${sortedTeams.length} teams based on registration time!`);
+    } catch (error) {
+      console.error('Error auto-assigning sequences:', error);
+      alert('❌ Failed to auto-assign sequences');
+    }
+  };
+
+  // Start manual sequence editing
+  const startEditingSequence = () => {
+    setEditingSequence('manual');
+    // Create a copy of teams for editing
+    setTempDiscordData(teams.map(t => String(t.registrationSequence || '')));
+  };
+
+  // Cancel sequence editing
+  const cancelEditingSequence = () => {
+    setEditingSequence(null);
+    setTempDiscordData([]);
+  };
+
+  // Save manual sequences
+  const saveManualSequences = async () => {
+    try {
+      const { updateTeam } = await import('@/lib/firebase-database');
+      
+      // Update each team with its sequence
+      for (let i = 0; i < teams.length; i++) {
+        const team = teams[i];
+        const sequence = parseInt(tempDiscordData[i]) || i + 1;
+        
+        await updateTeam(team.id, {
+          registrationSequence: sequence
+        });
+      }
+      
+      // Refresh teams data
+      const { getTeams } = await import('@/lib/firebase-database');
+      const tournamentId = tournament?.id || 'pYKa4M27SfgwxGoAYPRs';
+      const updatedTeams = await getTeams(tournamentId);
+      setTeams(updatedTeams);
+      
+      alert('✅ Manual sequences saved successfully!');
+      cancelEditingSequence();
+    } catch (error) {
+      console.error('Error saving manual sequences:', error);
+      alert('❌ Failed to save sequences');
+    }
+  };
+
+  // Update sequence for a specific team
+  const updateSequenceForTeam = (teamIndex: number, value: string) => {
+    const updated = [...tempDiscordData];
+    updated[teamIndex] = value;
+    setTempDiscordData(updated);
+  };
+
+  // Start editing Discord information for a team
+  const startEditingDiscord = (team: any) => {
+    setEditingTeamDiscord(team.id || team.name);
+    // Initialize with existing memberDiscords or create array with captain Discord
+    const existingDiscords = team.memberDiscords || [team.discord];
+    // Ensure array length matches members count
+    const discordArray = [...existingDiscords];
+    while (discordArray.length < team.members.length) {
+      discordArray.push('');
+    }
+    setTempDiscordData(discordArray);
+  };
+
+  // Cancel editing Discord information
+  const cancelEditingDiscord = () => {
+    setEditingTeamDiscord(null);
+    setTempDiscordData([]);
+  };
+
+  // Save Discord information for a team
+  const saveTeamDiscord = async (team: any) => {
+    try {
+      const { updateTeam } = await import('@/lib/firebase-database');
+      
+      // Update team with new Discord information
+      await updateTeam(team.id, {
+        memberDiscords: tempDiscordData
+      });
+
+      // Update local state
+      const updatedTeams = teams.map(t => 
+        t.id === team.id ? { ...t, memberDiscords: tempDiscordData } : t
+      );
+      setTeams(updatedTeams);
+
+      alert(`✅ Discord information updated for team: ${team.name}`);
+      cancelEditingDiscord();
+    } catch (error) {
+      console.error('Error updating team Discord info:', error);
+      alert('❌ Failed to update Discord information');
+    }
+  };
+
+  // Update Discord data for a specific member
+  const updateDiscordForMember = (memberIndex: number, value: string) => {
+    const updated = [...tempDiscordData];
+    updated[memberIndex] = value;
+    setTempDiscordData(updated);
+  };
+
+  // Resend Discord notification for a single team
+  const resendSingleTeamNotification = async (team: any) => {
+    if (!confirm(`Resend Discord notification for team "${team.name}"?`)) {
+      return;
+    }
+    
+    try {
+      const response = await fetch('/api/discord/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          team: {
+            ...team,
+            discordUsers: team.memberDiscords || [team.discord]
+          },
+          tournament: tournament
+        })
+      });
+
+      if (response.ok) {
+        alert(`✅ Discord notification sent for team: ${team.name}`);
+        console.log(`✅ Discord notification resent for team: ${team.name}`);
+      } else {
+        const errorText = await response.text();
+        alert(`❌ Failed to send notification for team ${team.name}: ${errorText}`);
+        console.error(`❌ Failed to resend notification for team ${team.name}:`, errorText);
+      }
+    } catch (error) {
+      alert(`❌ Error sending notification for team ${team.name}`);
+      console.error(`❌ Error resending notification for team ${team.name}:`, error);
+    }
+  };
+
+  // Resend Discord notifications for all registered teams
+  const resendDiscordNotifications = async () => {
+    if (!confirm('Are you sure you want to resend Discord notifications for all registered teams? This will send a message for each team in registration order.')) {
+      return;
+    }
+    
+    setIsResendingDiscord(true);
+    setMessage('🔄 Resending Discord notifications for all teams in registration order...');
+    
+    try {
+      if (!tournament) {
+        setMessage('❌ No tournament loaded');
+        return;
+      }
+
+      let successCount = 0;
+      let errorCount = 0;
+
+      // Sort teams by registration sequence (1st, 2nd, 3rd, etc.)
+      // Teams without sequence go to the end
+      const sortedTeams = [...teams].sort((a, b) => {
+        const seqA = a.registrationSequence || 999;
+        const seqB = b.registrationSequence || 999;
+        return seqA - seqB;
+      });
+
+      console.log('📋 Sending notifications in registration order:', sortedTeams.map(t => `${t.name} (#${t.registrationSequence || '?'})`));
+
+      // Send notification for each team in order
+      for (const team of sortedTeams) {
+        try {
+          const response = await fetch('/api/discord/register', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              team: {
+                ...team,
+                discordUsers: team.memberDiscords || [team.discord] // Use stored memberDiscords or fallback to captain discord
+              },
+              tournament: tournament
+            })
+          });
+
+          if (response.ok) {
+            successCount++;
+            console.log(`✅ Discord notification resent for team: ${team.name} (#${team.registrationSequence || '?'})`);
+          } else {
+            errorCount++;
+            const errorText = await response.text();
+            console.error(`❌ Failed to resend notification for team ${team.name} (#${team.registrationSequence || '?'}):`, errorText);
+          }
+        } catch (error) {
+          errorCount++;
+          console.error(`❌ Error resending notification for team ${team.name} (#${team.registrationSequence || '?'}):`, error);
+        }
+
+        // Add small delay between requests to avoid rate limiting
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+
+      setMessage(`✅ Discord notifications resent! Success: ${successCount}, Errors: ${errorCount}`);
+      
+    } catch (error) {
+      console.error('Error in bulk Discord resend:', error);
+      setMessage('❌ Failed to resend Discord notifications');
+    } finally {
+      setIsResendingDiscord(false);
+    }
+  };
+
   const resetTeams = async () => {
     if (!confirm('Are you sure you want to reset all teams? This will delete all registered teams.')) {
       return;
@@ -417,10 +671,11 @@ export default function AdminDashboard() {
           return;
         }
         
-        // Use the first tournament (or you could make this configurable)
+        // Use first tournament (or you could make this configurable)
         const tournamentId = tournaments[0].id || tournaments[0].name?.toLowerCase().replace(/\s+/g, '-');
         const teams = await getTeams(tournamentId);
         setTeamCount(teams.length);
+        setTeams(teams); // Store teams for debugging
         setTournamentStatus(teams.length >= 16 ? 'closed' : 'open');
       } catch (error) {
         console.error('Error loading teams:', error);
@@ -813,10 +1068,13 @@ const syncMatches = async () => {
                       <div className="text-sm text-slate-300">
                         <span className="font-semibold">Team Members:</span>
                       </div>
-                      <div className="grid grid-cols-2 gap-2 mt-2">
+                      <div className="grid grid-cols-1 gap-2 mt-2">
                         {tournament.winnerTeam.members.map((member: string, index: number) => (
                           <div key={index} className="bg-emerald-500/20 rounded px-2 py-1 text-xs text-emerald-300">
-                            {member}
+                            <span className="font-medium">{member}</span>
+                            {tournament.winnerTeam.memberDiscords && tournament.winnerTeam.memberDiscords[index] && (
+                              <span className="ml-2 text-slate-400">({tournament.winnerTeam.memberDiscords[index]})</span>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -927,6 +1185,43 @@ const syncMatches = async () => {
                 <p className="text-slate-300 text-sm mt-2">Auto-generate matches</p>
               </div>
 
+              {/* Discord Notifications */}
+              <div className="bg-white/10 backdrop-blur-md rounded-xl p-6 border border-white/20">
+                <h3 className="text-lg font-semibold text-white mb-2">Discord Notifications</h3>
+                <div className="space-y-2">
+                  <button
+                    onClick={resendDiscordNotifications}
+                    disabled={isResendingDiscord || teams.length === 0}
+                    className="w-full px-3 py-1 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 text-white text-sm rounded-lg transition-colors duration-200"
+                  >
+                    {isResendingDiscord ? '⏳ Resending...' : '📨 Resend All Team Notifications'}
+                  </button>
+                  <p className="text-slate-300 text-xs">Resend Discord notifications for all registered teams</p>
+                </div>
+              </div>
+
+              {/* Registration Sequence Management */}
+              <div className="bg-white/10 backdrop-blur-md rounded-xl p-6 border border-white/20">
+                <h3 className="text-lg font-semibold text-white mb-2">Registration Sequence</h3>
+                <div className="space-y-2">
+                  <button
+                    onClick={autoAssignSequences}
+                    disabled={teams.length === 0}
+                    className="w-full px-3 py-1 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-600 text-white text-sm rounded-lg transition-colors duration-200"
+                  >
+                    🔄 Auto-Assign Sequences
+                  </button>
+                  <button
+                    onClick={startEditingSequence}
+                    disabled={teams.length === 0}
+                    className="w-full px-3 py-1 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-600 text-white text-sm rounded-lg transition-colors duration-200"
+                  >
+                    ✏️ Manual Sequence Edit
+                  </button>
+                  <p className="text-slate-300 text-xs">Manage registration order (1st, 2nd, 3rd...)</p>
+                </div>
+              </div>
+
               {/* Reset Data */}
               <div className="bg-white/10 backdrop-blur-md rounded-xl p-6 border border-white/20">
                 <h3 className="text-lg font-semibold text-white mb-2">Reset Data</h3>
@@ -949,6 +1244,119 @@ const syncMatches = async () => {
                 <p className="text-slate-300 text-sm mt-2">Clear all data</p>
               </div>
             </div>
+
+            {/* Debug Section - Teams with Discord Info */}
+            <section className="card-glass p-6 mb-8">
+              <h2 className="text-xl font-semibold text-white mb-4">🔍 Debug: Registered Teams (Discord Info)</h2>
+              <div className="mb-4 p-3 bg-blue-500/10 rounded-lg border border-blue-500/30">
+                <p className="text-sm text-blue-300 mb-2">
+                  💡 <span className="font-semibold">Tip:</span> Use "📨 Resend All Team Notifications" to resend messages for teams that had Discord errors during registration.
+                  Individual team resend buttons are available below.
+                </p>
+                <p className="text-sm text-blue-300 mb-2">
+                  ✏️ <span className="font-semibold">New:</span> Click "✏️ Edit Discord" to manually add Discord usernames for old registrations that are missing Discord information.
+                </p>
+                <p className="text-sm text-blue-300">
+                  🔢 <span className="font-semibold">New:</span> Use "🔄 Auto-Assign Sequences" to number teams by registration time, or "✏️ Manual Sequence Edit" to set custom order (1st, 2nd, 3rd...).
+                </p>
+              </div>
+              {teams.length > 0 ? (
+                <div className="space-y-4">
+                  {teams.map((team, index) => (
+                    <div key={team.id || index} className="bg-white/5 rounded-lg p-4 border border-white/10">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <h3 className="text-lg font-medium text-emerald-400 mb-2">
+                            {team.name}
+                            {team.registrationSequence && (
+                              <span className="ml-2 px-2 py-1 bg-purple-500/20 text-purple-400 text-xs rounded">
+                                #{team.registrationSequence}
+                              </span>
+                            )}
+                            {team.memberDiscords && team.memberDiscords.length > 0 ? (
+                              <span className="ml-2 px-2 py-1 bg-green-500/20 text-green-400 text-xs rounded">✅ Discord Complete</span>
+                            ) : (
+                              <span className="ml-2 px-2 py-1 bg-amber-500/20 text-amber-400 text-xs rounded">⚠️ Discord Incomplete</span>
+                            )}
+                          </h3>
+                          <div className="space-y-1 text-sm">
+                            <p><span className="font-semibold text-white">Captain:</span> {team.captain}</p>
+                            <p><span className="font-semibold text-white">Captain Discord:</span> {team.discord}</p>
+                            <p><span className="font-semibold text-white">Reward Receiver:</span> {team.rewardReceiver}</p>
+                            <div className="flex gap-2 mt-2">
+                              <button
+                                onClick={() => resendSingleTeamNotification(team)}
+                                className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded transition-colors"
+                              >
+                                📨 Resend Notification
+                              </button>
+                              <button
+                                onClick={() => startEditingDiscord(team)}
+                                className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white text-xs rounded transition-colors"
+                              >
+                                ✏️ Edit Discord
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                        <div>
+                          <h4 className="text-md font-medium text-blue-400 mb-2">Team Members & Discord</h4>
+                          <div className="space-y-1 text-sm">
+                            {team.members.map((member: string, memberIndex: number) => (
+                              <div key={memberIndex} className="flex justify-between">
+                                <span className="text-slate-300">{member}</span>
+                                <span className="text-slate-400">
+                                  {team.memberDiscords && team.memberDiscords[memberIndex] 
+                                    ? team.memberDiscords[memberIndex] 
+                                    : 'No Discord stored'}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Discord Editing Interface */}
+                      {editingTeamDiscord === (team.id || team.name) && (
+                        <div className="mt-4 p-4 bg-amber-500/10 rounded-lg border border-amber-500/30">
+                          <h4 className="text-md font-medium text-amber-400 mb-3">✏️ Edit Discord Usernames</h4>
+                          <div className="space-y-2">
+                            {team.members.map((member: string, memberIndex: number) => (
+                              <div key={memberIndex} className="flex items-center gap-2">
+                                <label className="text-sm text-slate-300 w-24">{member}:</label>
+                                <input
+                                  type="text"
+                                  value={tempDiscordData[memberIndex] || ''}
+                                  onChange={(e) => updateDiscordForMember(memberIndex, e.target.value)}
+                                  placeholder="username#1234"
+                                  className="flex-1 px-2 py-1 bg-slate-800/50 border border-white/20 rounded text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                                />
+                              </div>
+                            ))}
+                          </div>
+                          <div className="flex gap-2 mt-3">
+                            <button
+                              onClick={() => saveTeamDiscord(team)}
+                              className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm rounded transition-colors"
+                            >
+                              💾 Save Changes
+                            </button>
+                            <button
+                              onClick={cancelEditingDiscord}
+                              className="px-3 py-1 bg-slate-600 hover:bg-slate-700 text-white text-sm rounded transition-colors"
+                            >
+                              ❌ Cancel
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-slate-400">No teams registered yet.</p>
+              )}
+            </section>
 
             {/* Quick Links */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1035,17 +1443,19 @@ const syncMatches = async () => {
                               </div>
                               
                               <div className="text-sm space-y-1">
+                                {match.result && (
+                                  <div className="mt-2 text-center">
+                                    <span className="text-xs font-medium text-emerald-400">Winner:</span>
+                                    <div className="text-xs text-white">{match.result}</div>
+                                  </div>
+                                )}
+                              </div>
+                              
+                              <div className="text-sm space-y-1">
                                 <div className="text-center font-medium text-white">{match.player1}</div>
                                 <div className="text-center text-slate-400 text-xs">VS</div>
                                 <div className="text-center font-medium text-white">{match.player2}</div>
                               </div>
-                              
-                              {match.result && (
-                                <div className="mt-2 text-center">
-                                  <span className="text-xs font-medium text-emerald-400">Winner:</span>
-                                  <div className="text-xs text-white">{match.result}</div>
-                                </div>
-                              )}
                             
                             {match.status === 'upcoming' && (
                               <button
