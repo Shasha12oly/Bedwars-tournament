@@ -87,14 +87,17 @@ export default function TournamentsPage() {
           if (isCompleted) {
             // Has winner = Completed (highest priority)
             correctStatus = 'completed';
-          } else if (teamCount < 16) {
-            // Less than 16 teams = Open for registration
+          } else if (teamCount < 13) {
+            // Less than 13 teams = Open for registration
             correctStatus = 'open';
+          } else if (teamCount >= 13 && teamCount < 16 && !hasMatches) {
+            // 13-15 teams, no matches = Closed (registration should be closed)
+            correctStatus = 'closed';
           } else if (teamCount >= 16 && !hasMatches) {
             // 16 teams, no matches = Closed (registration full, matches not generated)
             correctStatus = 'closed';
-          } else if (teamCount >= 16 && hasMatches) {
-            // 16 teams, has matches = Matches Generated
+          } else if (teamCount >= 13 && hasMatches) {
+            // 13+ teams, has matches = Matches Generated
             correctStatus = 'matches_generated';
           } else {
             // Default fallback

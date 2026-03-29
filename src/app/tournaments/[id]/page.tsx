@@ -5,7 +5,7 @@ import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import BottomNav from '@/components/BottomNav';
-import { getTournament, getTeams, getTeamCount } from '@/lib/firebase-database';
+import { getTournament, getTeams, getTeamCount, updateTournament } from '@/lib/firebase-database';
 
 interface Tournament {
   id: string;

@@ -220,6 +220,113 @@ export default function AdminDashboard() {
     }
   };
 
+  // Change tournament status manually
+  const changeTournamentStatus = async (newStatus: 'open' | 'closed') => {
+    try {
+      setIsResetting(true);
+      setMessage(`🔄 Changing tournament status to ${newStatus}...`);
+      
+      const { getTournaments, updateTournament } = await import('@/lib/firebase-database');
+      const tournaments = await getTournaments();
+      
+      if (tournaments.length === 0) {
+        setMessage('❌ No tournament found to update status.');
+        return;
+      }
+      
+      const tournament = tournaments[0];
+      const tournamentId = tournament.id || tournament.name?.toLowerCase().replace(/\s+/g, '-');
+      
+      // Update tournament status in database
+      await updateTournament(tournamentId, { status: newStatus });
+      console.log(`✅ Tournament status updated to ${newStatus}`);
+      
+      // Update local state
+      setTournamentStatus(newStatus);
+      
+      // Refresh tournament data
+      const updatedTournaments = await getTournaments();
+      if (updatedTournaments.length > 0) {
+        setTournament(updatedTournaments[0]);
+      }
+      
+      setMessage(`✅ Tournament status changed to "${newStatus}" and saved to database!`);
+      
+    } catch (error) {
+      setMessage('❌ Error changing tournament status. Please try again.');
+      console.error('Error changing tournament status:', error);
+    } finally {
+      setIsResetting(false);
+    }
+  };
+
+  // Close tournament registration and update match statuses
+  const closeTournamentRegistration = async () => {
+    try {
+      setIsResetting(true);
+      setMessage('🔄 Closing tournament registration and updating matches...');
+      
+      const { getTournaments, updateTournament, getMatches, updateMatches } = await import('@/lib/firebase-database');
+      const tournaments = await getTournaments();
+      
+      if (tournaments.length === 0) {
+        setMessage('❌ No tournament found to close registration for.');
+        return;
+      }
+      
+      const tournament = tournaments[0];
+      const tournamentId = tournament.id || tournament.name?.toLowerCase().replace(/\s+/g, '-');
+      
+      // Update tournament status to closed
+      await updateTournament(tournamentId, { status: 'closed' });
+      console.log('✅ Tournament status updated to closed');
+      
+      // Get all matches for this tournament
+      const matches = await getMatches(tournamentId);
+      
+      // Filter matches that are still 'upcoming' and have real players (not TBD)
+      const openMatches = matches.filter(match => 
+        match.status === 'upcoming' && 
+        match.player1 !== 'TBD' && 
+        match.player2 !== 'TBD'
+      );
+      
+      // Update open matches to 'generated' status
+      const updatedMatches = matches.map(match => {
+        if (match.status === 'upcoming' && match.player1 !== 'TBD' && match.player2 !== 'TBD') {
+          return {
+            ...match,
+            status: 'generated' as const
+          };
+        }
+        return match;
+      });
+      
+      if (openMatches.length > 0) {
+        await updateMatches(updatedMatches);
+        console.log(`✅ Updated ${openMatches.length} matches from 'upcoming' to 'generated'`);
+      }
+      
+      // Update local state
+      setTournamentStatus('closed');
+      setMatches(updatedMatches);
+      
+      setMessage(`✅ Tournament registration closed! ${openMatches.length > 0 ? `Updated ${openMatches.length} matches to 'generated' status.` : 'No matches needed updating.'}`);
+      
+      // Refresh tournament data
+      const updatedTournaments = await getTournaments();
+      if (updatedTournaments.length > 0) {
+        setTournament(updatedTournaments[0]);
+      }
+      
+    } catch (error) {
+      setMessage('❌ Error closing tournament registration. Please try again.');
+      console.error('Error closing tournament registration:', error);
+    } finally {
+      setIsResetting(false);
+    }
+  };
+
   // Initialize matches for tournament
   const initializeMatches = async () => {
     try {
@@ -1263,6 +1370,39 @@ const syncMatches = async () => {
                 <h3 className="text-lg font-semibold text-white mb-2">Tournament Status</h3>
                 <p className="text-xl font-semibold text-emerald-400 capitalize">{tournamentStatus}</p>
                 <p className="text-slate-300 text-sm">Registration Status</p>
+                {tournamentStatus === 'open' && (
+                  <button
+                    onClick={closeTournamentRegistration}
+                    disabled={isResetting}
+                    className="mt-3 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {isResetting ? 'Closing...' : '🔒 Close Registration'}
+                  </button>
+                )}
+              </div>
+
+              {/* Tournament Management */}
+              <div className="bg-white/10 backdrop-blur-md rounded-xl p-6 border border-white/20">
+                <h3 className="text-lg font-semibold text-white mb-4">🏆 Tournament Management</h3>
+                <div className="space-y-3">
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => changeTournamentStatus('open')}
+                      disabled={isResetting}
+                      className="px-4 py-2 bg-emerald-600/20 text-emerald-400 border border-emerald-600/30 rounded-lg font-medium hover:bg-emerald-600/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isResetting ? 'Opening...' : '🔓 Make Open'}
+                    </button>
+                    <button
+                      onClick={() => changeTournamentStatus('closed')}
+                      disabled={isResetting}
+                      className="px-4 py-2 bg-red-600/20 text-red-400 border border-red-600/30 rounded-lg font-medium hover:bg-red-600/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isResetting ? 'Closing...' : '🔒 Make Closed'}
+                    </button>
+                  </div>
+                  <p className="text-slate-300 text-sm">Manually control tournament registration status</p>
+                </div>
               </div>
 
               {/* Generate Matches Button */}
