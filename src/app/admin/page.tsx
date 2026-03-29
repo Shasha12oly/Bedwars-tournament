@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
+import BracketEditor from '@/components/BracketEditor';
 
 interface Match {
   id: string;
@@ -39,6 +40,8 @@ export default function AdminDashboard() {
   const [tempDiscordData, setTempDiscordData] = useState<string[]>([]);
   const [editingSequence, setEditingSequence] = useState<string | null>(null);
   const [sequenceMode, setSequenceMode] = useState<'manual' | 'auto'>('auto');
+  const [disqualifyingTeam, setDisqualifyingTeam] = useState<string | null>(null);
+  const [disqualificationReason, setDisqualificationReason] = useState('');
 
   // Generate random team names
   const generateRandomTeamNames = () => {
@@ -654,6 +657,106 @@ export default function AdminDashboard() {
     } finally {
       setIsResetting(false);
     }
+  };
+
+  // Disqualify a team
+  const handleDisqualifyTeam = async (teamId: string, teamName: string) => {
+    if (!disqualificationReason.trim()) {
+      alert('Please provide a reason for disqualification');
+      return;
+    }
+    
+    // Check if there are active matches
+    const activeMatches = matches.filter(match => 
+      match.status !== 'completed' && 
+      (match.player1 === teamName || match.player2 === teamName)
+    );
+    
+    let confirmMessage = `Are you sure you want to disqualify "${teamName}"?\n\nReason: ${disqualificationReason}`;
+    
+    if (activeMatches.length > 0) {
+      confirmMessage += `\n\n⚠️ WARNING: This team has ${activeMatches.length} active match(es) that will be affected:\n`;
+      activeMatches.forEach(match => {
+        confirmMessage += `• ${match.round}: ${match.player1} vs ${match.player2}\n`;
+      });
+      confirmMessage += `\nThe opponent(s) will automatically win these matches.`;
+    }
+    
+    if (!confirm(confirmMessage)) {
+      return;
+    }
+    
+    try {
+      const { disqualifyTeam, handleDisqualificationImpact } = await import('@/lib/firebase-database');
+      
+      // First, disqualify the team
+      await disqualifyTeam(teamId, disqualificationReason, 'Admin');
+      
+      // Then handle the impact on matches
+      if (activeMatches.length > 0) {
+        await handleDisqualificationImpact(tournament?.id || 'pYKa4M27SfgwxGoAYPRs', teamName);
+        
+        // Refresh matches data
+        const { getMatches } = await import('@/lib/firebase-database');
+        const updatedMatches = await getMatches(tournament?.id || 'pYKa4M27SfgwxGoAYPRs');
+        setMatches(updatedMatches);
+      }
+      
+      // Refresh teams data
+      const { getTeams } = await import('@/lib/firebase-database');
+      const tournamentId = tournament?.id || 'pYKa4M27SfgwxGoAYPRs';
+      const updatedTeams = await getTeams(tournamentId);
+      setTeams(updatedTeams);
+      
+      let successMessage = `✅ Team "${teamName}" has been disqualified`;
+      if (activeMatches.length > 0) {
+        successMessage += ` and ${activeMatches.length} match(es) have been updated automatically`;
+      }
+      
+      setMessage(successMessage);
+      setDisqualifyingTeam(null);
+      setDisqualificationReason('');
+      setTimeout(() => setMessage(''), 5000);
+    } catch (error) {
+      console.error('Error disqualifying team:', error);
+      setMessage('❌ Failed to disqualify team and update matches');
+    }
+  };
+
+  // Reinstate a disqualified team
+  const handleReinstateTeam = async (teamId: string, teamName: string) => {
+    if (!confirm(`Are you sure you want to reinstate "${teamName}"?`)) {
+      return;
+    }
+    
+    try {
+      const { reinstateTeam } = await import('@/lib/firebase-database');
+      await reinstateTeam(teamId, 'Admin');
+      
+      // Refresh teams data
+      const { getTeams } = await import('@/lib/firebase-database');
+      const tournamentId = tournament?.id || 'pYKa4M27SfgwxGoAYPRs';
+      const updatedTeams = await getTeams(tournamentId);
+      setTeams(updatedTeams);
+      
+      setMessage(`✅ Team "${teamName}" has been reinstated`);
+      setTimeout(() => setMessage(''), 3000);
+    } catch (error) {
+      console.error('Error reinstating team:', error);
+      setMessage('❌ Failed to reinstate team');
+    }
+  };
+
+  // Start disqualification process
+  const startDisqualification = (teamId: string) => {
+    setDisqualifyingTeam(teamId);
+    setDisqualificationReason('');
+  };
+
+  // Cancel disqualification
+  const cancelDisqualification = () => {
+    setDisqualifyingTeam(null);
+    setDisqualificationReason('');
   };
 
   useEffect(() => {
@@ -1273,17 +1376,32 @@ const syncMatches = async () => {
                                 #{team.registrationSequence}
                               </span>
                             )}
-                            {team.memberDiscords && team.memberDiscords.length > 0 ? (
+                            {team.status === 'disqualified' ? (
+                              <span className="ml-2 px-2 py-1 bg-red-500/20 text-red-400 text-xs rounded">❌ Disqualified</span>
+                            ) : team.memberDiscords && team.memberDiscords.length > 0 ? (
                               <span className="ml-2 px-2 py-1 bg-green-500/20 text-green-400 text-xs rounded">✅ Discord Complete</span>
                             ) : (
                               <span className="ml-2 px-2 py-1 bg-amber-500/20 text-amber-400 text-xs rounded">⚠️ Discord Incomplete</span>
+                            )}
+                            {team.status !== 'disqualified' && matches.some(match => 
+                              match.status !== 'completed' && 
+                              (match.player1 === team.name || match.player2 === team.name)
+                            ) && (
+                              <span className="ml-2 px-2 py-1 bg-blue-500/20 text-blue-400 text-xs rounded">🎮 Active Match</span>
                             )}
                           </h3>
                           <div className="space-y-1 text-sm">
                             <p><span className="font-semibold text-white">Captain:</span> {team.captain}</p>
                             <p><span className="font-semibold text-white">Captain Discord:</span> {team.discord}</p>
                             <p><span className="font-semibold text-white">Reward Receiver:</span> {team.rewardReceiver}</p>
-                            <div className="flex gap-2 mt-2">
+                            {team.status === 'disqualified' && (
+                              <>
+                                <p><span className="font-semibold text-red-400">Disqualified:</span> {team.disqualificationReason || 'No reason provided'}</p>
+                                <p><span className="font-semibold text-red-400">Disqualified At:</span> {team.disqualifiedAt ? new Date(team.disqualifiedAt).toLocaleString() : 'Unknown'}</p>
+                                <p><span className="font-semibold text-red-400">Disqualified By:</span> {team.disqualifiedBy || 'Unknown'}</p>
+                              </>
+                            )}
+                            <div className="flex gap-2 mt-2 flex-wrap">
                               <button
                                 onClick={() => resendSingleTeamNotification(team)}
                                 className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded transition-colors"
@@ -1296,6 +1414,21 @@ const syncMatches = async () => {
                               >
                                 ✏️ Edit Discord
                               </button>
+                              {team.status === 'disqualified' ? (
+                                <button
+                                  onClick={() => handleReinstateTeam(team.id, team.name)}
+                                  className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded transition-colors"
+                                >
+                                  ✅ Reinstate Team
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => startDisqualification(team.id)}
+                                  className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded transition-colors"
+                                >
+                                  ❌ Disqualify Team
+                                </button>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -1358,6 +1491,49 @@ const syncMatches = async () => {
               )}
             </section>
 
+            {/* Disqualification Modal */}
+            {disqualifyingTeam && (
+              <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                <div className="bg-slate-800 rounded-lg p-6 border border-white/20 max-w-md w-full mx-4">
+                  <h3 className="text-lg font-medium text-red-400 mb-4">❌ Disqualify Team</h3>
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">
+                        Reason for Disqualification
+                      </label>
+                      <textarea
+                        value={disqualificationReason}
+                        onChange={(e) => setDisqualificationReason(e.target.value)}
+                        className="w-full px-3 py-2 bg-slate-700 border border-white/20 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-red-400"
+                        rows={3}
+                        placeholder="Enter the reason for disqualification..."
+                        required
+                      />
+                    </div>
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => {
+                          const team = teams.find(t => t.id === disqualifyingTeam);
+                          if (team) {
+                            handleDisqualifyTeam(disqualifyingTeam, team.name);
+                          }
+                        }}
+                        className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
+                      >
+                        ❌ Disqualify Team
+                      </button>
+                      <button
+                        onClick={cancelDisqualification}
+                        className="flex-1 px-4 py-2 bg-slate-600 hover:bg-slate-700 text-white rounded-lg transition-colors"
+                      >
+                        ❌ Cancel
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Quick Links */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="bg-white/5 rounded-lg p-4 border border-white/10">
@@ -1376,10 +1552,34 @@ const syncMatches = async () => {
                     Tournament Rounds
                   </Link>
                   <Link
+                    href="/admin/time-preferences"
+                    className="block text-emerald-400 hover:text-emerald-300 transition-colors"
+                  >
+                    ⏰ Time Preferences
+                  </Link>
+                  <Link
+                    href="/admin/team-messaging"
+                    className="block text-emerald-400 hover:text-emerald-300 transition-colors"
+                  >
+                    📨 Team Messaging
+                  </Link>
+                  <Link
+                    href="/admin/discord-test"
+                    className="block text-emerald-400 hover:text-emerald-300 transition-colors"
+                  >
+                    🤖 Discord Test
+                  </Link>
+                  <Link
                     href="/message-sender"
                     className="block text-emerald-400 hover:text-emerald-300 transition-colors"
                   >
                     📨 Send Message
+                  </Link>
+                  <Link
+                    href="/matches"
+                    className="block text-emerald-400 hover:text-emerald-300 transition-colors"
+                  >
+                    Live Matches
                   </Link>
                   <Link
                     href="/matches"
@@ -1412,10 +1612,22 @@ const syncMatches = async () => {
             </div>
           </section>
 
-          {/* Match Management */}
+          {/* Tournament Bracket Editor */}
+          {matches.length > 0 && (
+            <section className="mb-8">
+              <BracketEditor
+                matches={matches}
+                teams={teams}
+                onMatchesUpdate={(updatedMatches) => setMatches(updatedMatches)}
+                tournamentId={tournament?.id || 'pYKa4M27SfgwxGoAYPRs'}
+              />
+            </section>
+          )}
+
+          {/* Legacy Match Management (for starting/completing matches) */}
           {matches.length > 0 && (
             <section className="card-glass p-6 mb-8">
-              <h2 className="text-xl font-semibold text-white mb-6">Match Management</h2>
+              <h2 className="text-xl font-semibold text-white mb-6">Match Control Panel</h2>
               
               <div className="space-y-6">
                 {['Round of 16', 'Quarterfinals', 'Semifinals', 'Finals'].map((round) => {

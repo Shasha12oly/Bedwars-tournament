@@ -18,6 +18,16 @@ interface Match {
   format: string;
 }
 
+// Generate proper time slots for 15 matches from 3 PM to 8 PM
+const generateMatchTimes = () => {
+  const timeSlots = [
+    '3:00 PM', '3:20 PM', '3:40 PM', '4:00 PM', '4:20 PM',
+    '4:40 PM', '5:00 PM', '5:20 PM', '5:40 PM', '6:00 PM',
+    '6:20 PM', '6:40 PM', '7:00 PM', '7:20 PM', '7:40 PM'
+  ];
+  return timeSlots;
+};
+
 const mockMatches: Match[] = [
   // Round of 16 - 8 matches (16 teams total)
   {
@@ -28,7 +38,7 @@ const mockMatches: Match[] = [
     player2: 'Team B',
     status: 'upcoming',
     result: null,
-    scheduledTime: '2:00 PM',
+    scheduledTime: generateMatchTimes()[0],
     format: 'rbw 4v4'
   },
   {
@@ -39,7 +49,7 @@ const mockMatches: Match[] = [
     player2: 'Team D',
     status: 'upcoming',
     result: null,
-    scheduledTime: '2:15 PM',
+    scheduledTime: generateMatchTimes()[1],
     format: 'rbw 4v4'
   },
   {
@@ -50,7 +60,7 @@ const mockMatches: Match[] = [
     player2: 'Team F',
     status: 'upcoming',
     result: null,
-    scheduledTime: '2:30 PM',
+    scheduledTime: generateMatchTimes()[2],
     format: 'rbw 4v4'
   },
   {
@@ -61,7 +71,7 @@ const mockMatches: Match[] = [
     player2: 'Team H',
     status: 'upcoming',
     result: null,
-    scheduledTime: '2:45 PM',
+    scheduledTime: generateMatchTimes()[3],
     format: 'rbw 4v4'
   },
   {
@@ -72,7 +82,7 @@ const mockMatches: Match[] = [
     player2: 'Team J',
     status: 'upcoming',
     result: null,
-    scheduledTime: '3:00 PM',
+    scheduledTime: generateMatchTimes()[4],
     format: 'rbw 4v4'
   },
   {
@@ -83,7 +93,7 @@ const mockMatches: Match[] = [
     player2: 'Team L',
     status: 'upcoming',
     result: null,
-    scheduledTime: '3:15 PM',
+    scheduledTime: generateMatchTimes()[5],
     format: 'rbw 4v4'
   },
   {
@@ -94,7 +104,7 @@ const mockMatches: Match[] = [
     player2: 'Team N',
     status: 'upcoming',
     result: null,
-    scheduledTime: '3:30 PM',
+    scheduledTime: generateMatchTimes()[6],
     format: 'rbw 4v4'
   },
   {
@@ -105,7 +115,7 @@ const mockMatches: Match[] = [
     player2: 'Team P',
     status: 'upcoming',
     result: null,
-    scheduledTime: '3:45 PM',
+    scheduledTime: generateMatchTimes()[7],
     format: 'rbw 4v4'
   },
   
@@ -118,7 +128,7 @@ const mockMatches: Match[] = [
     player2: 'TBD',
     status: 'upcoming',
     result: null,
-    scheduledTime: '4:30 PM',
+    scheduledTime: generateMatchTimes()[8],
     format: 'rbw 4v4'
   },
   {
@@ -129,7 +139,7 @@ const mockMatches: Match[] = [
     player2: 'TBD',
     status: 'upcoming',
     result: null,
-    scheduledTime: '4:45 PM',
+    scheduledTime: generateMatchTimes()[9],
     format: 'rbw 4v4'
   },
   {
@@ -140,7 +150,7 @@ const mockMatches: Match[] = [
     player2: 'TBD',
     status: 'upcoming',
     result: null,
-    scheduledTime: '5:00 PM',
+    scheduledTime: generateMatchTimes()[10],
     format: 'rbw 4v4'
   },
   {
@@ -151,7 +161,7 @@ const mockMatches: Match[] = [
     player2: 'TBD',
     status: 'upcoming',
     result: null,
-    scheduledTime: '5:15 PM',
+    scheduledTime: generateMatchTimes()[11],
     format: 'rbw 4v4'
   },
   
@@ -164,7 +174,7 @@ const mockMatches: Match[] = [
     player2: 'TBD',
     status: 'upcoming',
     result: null,
-    scheduledTime: '6:00 PM',
+    scheduledTime: generateMatchTimes()[12],
     format: 'rbw 4v4'
   },
   {
@@ -175,7 +185,7 @@ const mockMatches: Match[] = [
     player2: 'TBD',
     status: 'upcoming',
     result: null,
-    scheduledTime: '6:15 PM',
+    scheduledTime: generateMatchTimes()[13],
     format: 'rbw 4v4'
   },
   
@@ -188,7 +198,7 @@ const mockMatches: Match[] = [
     player2: 'TBD',
     status: 'upcoming',
     result: null,
-    scheduledTime: '7:00 PM',
+    scheduledTime: generateMatchTimes()[14],
     format: 'rbw 4v4'
   }
 ];
@@ -249,11 +259,7 @@ export default function Matches() {
           player2: match.player2,
           status: match.status,
           result: match.result || null,
-          scheduledTime: new Date(match.scheduledTime).toLocaleTimeString('en-US', { 
-            hour: 'numeric', 
-            minute: '2-digit',
-            hour12: true 
-          }),
+          scheduledTime: match.scheduledTime, // Use the time string directly
           format: 'rbw 4v4' as const
         }));
         

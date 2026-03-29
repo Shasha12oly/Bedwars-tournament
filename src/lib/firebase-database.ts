@@ -25,10 +25,19 @@ export interface Team {
   discord: string;
   memberDiscords?: string[]; // Store individual Discord usernames for each member
   rewardReceiver?: string;
-  status: 'confirmed' | 'pending' | 'registered';
+  status: 'confirmed' | 'pending' | 'registered' | 'disqualified';
   tournamentId: string;
   registeredAt: string | Timestamp;
   registrationSequence?: number; // Order of registration (1st, 2nd, 3rd, etc.)
+  disqualifiedAt?: string | Timestamp; // When the team was disqualified
+  disqualificationReason?: string; // Reason for disqualification
+  disqualifiedBy?: string; // Admin who disqualified the team
+  timePreferences?: {
+    preferredDays: string[];
+    preferredTimes: string[];
+    timezone: string;
+    notes?: string;
+  };
 }
 
 export interface Match {
@@ -464,9 +473,279 @@ export async function updateSingleMatch(matchId: string, updates: Partial<Match>
     }
     
     await updateDoc(matchRef, updates);
-    console.log(`✅ Updated match ${matchId} with:`, updates);
+    console.log(`✅ Match ${matchId} updated successfully`);
   } catch (error) {
-    console.error('Error updating single match:', error);
+    console.error('Error updating match:', error);
+    throw error;
+  }
+}
+
+// Disqualify a team from tournament
+export async function disqualifyTeam(
+  teamId: string, 
+  reason: string, 
+  disqualifiedBy: string = 'Admin'
+): Promise<void> {
+  try {
+    const teamRef = doc(db, TEAMS_COLLECTION, teamId);
+    
+    // Check if team exists
+    const teamDoc = await getDoc(teamRef);
+    if (!teamDoc.exists()) {
+      throw new Error(`Team ${teamId} does not exist`);
+    }
+    
+    const teamData = teamDoc.data();
+    if (teamData.status === 'disqualified') {
+      console.warn(`⚠️ Team ${teamData.name} is already disqualified`);
+      return;
+    }
+    
+    // Update team with disqualification info
+    await updateDoc(teamRef, {
+      status: 'disqualified',
+      disqualifiedAt: new Date(),
+      disqualificationReason: reason,
+      disqualifiedBy: disqualifiedBy
+    });
+    
+    console.log(`✅ Team ${teamData.name} has been disqualified. Reason: ${reason}`);
+  } catch (error) {
+    console.error('Error disqualifying team:', error);
+    throw error;
+  }
+}
+
+// Handle disqualification impact on matches
+export async function handleDisqualificationImpact(
+  tournamentId: string, 
+  disqualifiedTeamName: string
+): Promise<void> {
+  try {
+    const matchesRef = collection(db, MATCHES_COLLECTION);
+    const q = query(matchesRef, where('tournamentId', '==', tournamentId));
+    const querySnapshot = await getDocs(q);
+    
+    const affectedMatches: string[] = [];
+    
+    // Find all matches involving the disqualified team
+    for (const doc of querySnapshot.docs) {
+      const match = doc.data();
+      if (match.player1 === disqualifiedTeamName || match.player2 === disqualifiedTeamName) {
+        // Determine the winner (the other team)
+        const winner = match.player1 === disqualifiedTeamName ? match.player2 : match.player1;
+        
+        // Update the match with result
+        await updateDoc(doc.ref, {
+          status: 'completed',
+          result: `${winner} (Opponent Disqualified)`,
+          completedAt: new Date()
+        });
+        
+        affectedMatches.push(doc.id);
+        console.log(`✅ Match ${match.round}: ${match.player1} vs ${match.player2} - Winner: ${winner} (Opponent Disqualified)`);
+      }
+    }
+    
+    // Update future matches that depend on these results
+    await updateTournamentBracket(tournamentId, disqualifiedTeamName);
+    
+    console.log(`✅ Disqualification impact handled for ${affectedMatches.length} matches`);
+  } catch (error) {
+    console.error('Error handling disqualification impact:', error);
+    throw error;
+  }
+}
+
+// Update tournament bracket after disqualification
+export async function updateTournamentBracket(
+  tournamentId: string, 
+  disqualifiedTeamName: string
+): Promise<void> {
+  try {
+    const matchesRef = collection(db, MATCHES_COLLECTION);
+    const q = query(matchesRef, where('tournamentId', '==', tournamentId));
+    const querySnapshot = await getDocs(q);
+    
+    // Get all matches and sort by round
+    const matches: Match[] = querySnapshot.docs.map(doc => ({
+      ...doc.data() as Match,
+      id: doc.id
+    })).sort((a, b) => {
+      // Sort by round order (Round of 64, Round of 32, etc.)
+      const roundOrder = ['Round of 64', 'Round of 32', 'Round of 16', 'Quarterfinals', 'Semifinals', 'Finals'];
+      const aIndex = roundOrder.indexOf(a.round);
+      const bIndex = roundOrder.indexOf(b.round);
+      return aIndex - bIndex;
+    });
+    
+    // Update matches where the disqualified team was supposed to advance
+    for (const match of matches) {
+      if (match.status === 'upcoming' && 
+          (match.player1 === disqualifiedTeamName || match.player2 === disqualifiedTeamName)) {
+        
+        // Find the winner from previous round that should advance
+        const winner = await findAdvancingTeam(tournamentId, match, disqualifiedTeamName);
+        
+        if (winner) {
+          await updateDoc(doc(db, MATCHES_COLLECTION, match.id), {
+            player1: match.player1 === disqualifiedTeamName ? winner : match.player1,
+            player2: match.player2 === disqualifiedTeamName ? winner : match.player2
+          });
+          
+          console.log(`✅ Updated bracket match ${match.round}: ${match.player1} vs ${match.player2} -> ${winner} advances`);
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Error updating tournament bracket:', error);
+    throw error;
+  }
+}
+
+// Find the advancing team to replace disqualified team
+async function findAdvancingTeam(
+  tournamentId: string, 
+  currentMatch: Match, 
+  disqualifiedTeamName: string
+): Promise<string | null> {
+  try {
+    const matchesRef = collection(db, MATCHES_COLLECTION);
+    const q = query(matchesRef, where('tournamentId', '==', tournamentId));
+    const querySnapshot = await getDocs(q);
+    
+    // Find matches from previous rounds that feed into this match
+    const previousMatches = querySnapshot.docs
+      .map(doc => doc.data() as Match)
+      .filter(match => 
+        match.status === 'completed' && 
+        match.result && 
+        match.result.includes(disqualifiedTeamName) === false
+      );
+    
+    // Return the most recent winner that's not the disqualified team
+    if (previousMatches.length > 0) {
+      const lastMatch = previousMatches[previousMatches.length - 1];
+      return lastMatch.result?.split(' ')[0] || null;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Error finding advancing team:', error);
+    return null;
+  }
+}
+
+// Reinstate a disqualified team
+export async function reinstateTeam(teamId: string, reinstatedBy: string = 'Admin'): Promise<void> {
+  try {
+    const teamRef = doc(db, TEAMS_COLLECTION, teamId);
+    
+    // Check if team exists
+    const teamDoc = await getDoc(teamRef);
+    if (!teamDoc.exists()) {
+      throw new Error(`Team ${teamId} does not exist`);
+    }
+    
+    const teamData = teamDoc.data();
+    if (teamData.status !== 'disqualified') {
+      console.warn(`⚠️ Team ${teamData.name} is not disqualified`);
+      return;
+    }
+    
+    // Update team to remove disqualification
+    await updateDoc(teamRef, {
+      status: 'registered',
+      disqualifiedAt: deleteField(),
+      disqualificationReason: deleteField(),
+      disqualifiedBy: deleteField()
+    });
+    
+    console.log(`✅ Team ${teamData.name} has been reinstated`);
+  } catch (error) {
+    console.error('Error reinstating team:', error);
+    throw error;
+  }
+}
+
+// Generate tournament bracket
+export async function generateBracket(tournamentId: string, qualifiedTeams: Team[]): Promise<Match[]> {
+  try {
+    // Clear existing matches for this tournament
+    const matchesRef = collection(db, MATCHES_COLLECTION);
+    const q = query(matchesRef, where('tournamentId', '==', tournamentId));
+    const querySnapshot = await getDocs(q);
+    
+    // Delete existing matches
+    const deletePromises = querySnapshot.docs.map(doc => deleteDoc(doc.ref));
+    await Promise.all(deletePromises);
+    
+    const teamNames = qualifiedTeams.map(team => team.name);
+    const matches: Match[] = [];
+    
+    // Determine bracket structure based on number of teams
+    const numTeams = teamNames.length;
+    let bracketSize = 64;
+    
+    if (numTeams <= 32) bracketSize = 32;
+    if (numTeams <= 16) bracketSize = 16;
+    if (numTeams <= 8) bracketSize = 8;
+    if (numTeams <= 4) bracketSize = 4;
+    
+    // Shuffle teams for random placement
+    const shuffledTeams = [...teamNames].sort(() => Math.random() - 0.5);
+    
+    // Fill remaining spots with "TBD" if needed
+    while (shuffledTeams.length < bracketSize) {
+      shuffledTeams.push('TBD');
+    }
+    
+    // Generate matches based on bracket size
+    let currentRoundTeams = shuffledTeams;
+    let roundIndex = 0;
+    
+    const roundNames = {
+      64: 'Round of 64',
+      32: 'Round of 32',
+      16: 'Round of 16',
+      8: 'Quarterfinals',
+      4: 'Semifinals',
+      2: 'Finals'
+    };
+    
+    while (currentRoundTeams.length > 1) {
+      const roundSize = currentRoundTeams.length;
+      const roundName = roundNames[roundSize as keyof typeof roundNames] || `Round of ${roundSize}`;
+      const numMatches = roundSize / 2;
+      
+      for (let i = 0; i < numMatches; i++) {
+        const player1 = currentRoundTeams[i * 2];
+        const player2 = currentRoundTeams[i * 2 + 1];
+        
+        const match: Match = {
+          id: `${tournamentId}-${roundName}-${i + 1}`,
+          tournamentId,
+          round: roundName,
+          player1,
+          player2,
+          status: 'upcoming',
+          result: null,
+          scheduledTime: `Match ${i + 1}`
+        };
+        
+        matches.push(match);
+        await setDoc(doc(matchesRef, match.id), match);
+      }
+      
+      // Prepare next round (winners advance as TBD for now)
+      currentRoundTeams = Array(numMatches).fill('TBD');
+      roundIndex++;
+    }
+    
+    console.log(`✅ Generated ${matches.length} matches for tournament with ${numTeams} teams`);
+    return matches;
+  } catch (error) {
+    console.error('Error generating bracket:', error);
     throw error;
   }
 }
