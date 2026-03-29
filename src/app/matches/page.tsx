@@ -12,7 +12,7 @@ interface Match {
   round: string;
   player1: string;
   player2: string;
-  status: 'upcoming' | 'live' | 'completed';
+  status: 'upcoming' | 'generated' | 'live' | 'completed';
   result: string | null;
   scheduledTime: string;
   format: string;
