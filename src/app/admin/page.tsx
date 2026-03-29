@@ -1,24 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getTeams, getMatches, updateMatches, updateSingleMatch, resetTournamentTeams, resetTournamentMatches, registerTeam, getTournament, updateTournament } from '@/lib/firebase-database';
+import { getTeams, getMatches, updateMatches, updateSingleMatch, resetTournamentTeams, resetTournamentMatches, registerTeam, getTournament, updateTournament, Match } from '@/lib/firebase-database';
 import { generateTournamentMatches } from '@/lib/match-making';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import BracketEditor from '@/components/BracketEditor';
-
-interface Match {
-  id: string;
-  tournamentId: string;
-  round: string;
-  player1: string;
-  player2: string;
-  status: 'upcoming' | 'live' | 'completed';
-  result: string | null;
-  scheduledTime: string;
-}
 
 export default function AdminDashboard() {
   const router = useRouter();
