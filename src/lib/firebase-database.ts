@@ -362,6 +362,33 @@ export async function updateMatch(matchId: string, matchData: Partial<Match>): P
   try {
     const matchRef = doc(db, MATCHES_COLLECTION, matchId);
     await updateDoc(matchRef, matchData);
+
+    // Check if match is being completed and has a winner
+    if (matchData.status === 'completed' && matchData.result) {
+      console.log('🏆 Match completed, sending Discord notification...');
+      
+      // Import the notification function
+      const { sendMatchCompletionNotification } = await import('./discord-notifications');
+      
+      // Get tournament name for the notification
+      const tournamentName = 'BedWars Tournament'; // You can make this dynamic
+      
+      // Send Discord notification
+      await sendMatchCompletionNotification(
+        { 
+          id: matchId, 
+          player1: matchData.player1 || '', 
+          player2: matchData.player2 || '', 
+          winner: matchData.result,
+          round: matchData.round || '',
+          status: 'completed',
+          result: matchData.result,
+          scheduledTime: matchData.scheduledTime || '',
+          tournamentId: matchData.tournamentId || ''
+        } as Match,
+        tournamentName
+      );
+    }
   } catch (error) {
     console.error('Error updating match:', error);
     throw error;
@@ -472,8 +499,62 @@ export async function updateSingleMatch(matchId: string, updates: Partial<Match>
       return;
     }
     
+    // Get the current match data before updating
+    const currentMatch = matchDoc.data() as Match;
+    
     await updateDoc(matchRef, updates);
     console.log(`✅ Match ${matchId} updated successfully`);
+
+    // Check if match is being completed and has a winner
+    if (updates.status === 'completed' && updates.result) {
+      console.log('🏆 Match completed, sending Discord notification...');
+      
+      // Import the notification function
+      const { sendMatchCompletionNotification } = await import('./discord-notifications');
+      
+      // Get tournament name for the notification
+      const tournamentName = 'BedWars Tournament'; // You can make this dynamic
+      
+      // Try to get Discord IDs from team data
+      let winnerDiscordId: string | undefined;
+      let loserDiscordId: string | undefined;
+      
+      try {
+        // Get teams to find Discord IDs
+        const { getTeams } = await import('./firebase-database');
+        const teams = await getTeams(currentMatch.tournamentId);
+        
+        // Find winner team
+        const winnerTeam = teams.find(team => team.name === updates.result);
+        const loserTeam = teams.find(team => 
+          team.name === currentMatch.player1 || team.name === currentMatch.player2
+        );
+        
+        if (winnerTeam?.discord) {
+          winnerDiscordId = winnerTeam.discord;
+        }
+        
+        if (loserTeam?.discord && loserTeam.name !== updates.result) {
+          loserDiscordId = loserTeam.discord;
+        }
+        
+        console.log(`🔍 Found Discord IDs - Winner: ${winnerDiscordId}, Loser: ${loserDiscordId}`);
+      } catch (error) {
+        console.warn('⚠️ Could not fetch team Discord IDs:', error);
+      }
+      
+      // Send Discord notification with the updated match data
+      await sendMatchCompletionNotification(
+        { 
+          ...currentMatch,
+          ...updates,
+          id: matchId
+        } as Match,
+        tournamentName,
+        winnerDiscordId,
+        loserDiscordId
+      );
+    }
   } catch (error) {
     console.error('Error updating match:', error);
     throw error;

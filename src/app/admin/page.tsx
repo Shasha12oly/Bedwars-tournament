@@ -1576,6 +1576,12 @@ const syncMatches = async () => {
                     📨 Send Message
                   </Link>
                   <Link
+                    href="/admin/test-notification"
+                    className="block text-emerald-400 hover:text-emerald-300 transition-colors"
+                  >
+                    🏆 Test Notification
+                  </Link>
+                  <Link
                     href="/matches"
                     className="block text-emerald-400 hover:text-emerald-300 transition-colors"
                   >
