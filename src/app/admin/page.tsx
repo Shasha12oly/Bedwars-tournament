@@ -106,13 +106,15 @@ export default function AdminDashboard() {
       );
       setMatches(uniqueMatches);
       
-      // Update tournament status in database
+      // Update tournament status in database and clear manual override
       const { updateDoc, doc } = await import('firebase/firestore');
       const { db } = await import('@/lib/firebase');
       const tournamentRef = doc(db, 'tournaments', tournamentId);
       await updateDoc(tournamentRef, { 
         status: 'matches_generated',
-        matchesGenerated: true
+        matchesGenerated: true,
+        manualStatusOverride: null,
+        forceStatus: null
       });
       
       // Update local state
@@ -124,7 +126,7 @@ export default function AdminDashboard() {
         setTournament(updatedTournaments[0]);
       }
       
-      setMessage(`✅ Tournament bracket generated successfully! ${result.totalTeams} teams in ${result.bracketSize}-team bracket with ${result.matches.length} matches.`);
+      setMessage(`✅ Tournament bracket generated successfully! ${result.totalTeams} teams in ${result.bracketSize}-team bracket with ${result.matches.length} matches. Manual override cleared.`);
       
     } catch (error) {
       setMessage('❌ Error generating matches. Please try again.');
@@ -226,9 +228,13 @@ export default function AdminDashboard() {
       const tournament = tournaments[0];
       const tournamentId = tournament.id || tournament.name?.toLowerCase().replace(/\s+/g, '-');
       
-      // Update tournament status in database
-      await updateTournament(tournamentId, { status: newStatus });
-      console.log(`✅ Tournament status updated to ${newStatus}`);
+      // Update tournament status in database with manual override flag
+      await updateTournament(tournamentId, { 
+        status: newStatus,
+        manualStatusOverride: true,
+        forceStatus: true
+      });
+      console.log(`✅ Tournament status updated to ${newStatus} with manual override`);
       
       // Update local state
       setTournamentStatus(newStatus);
@@ -239,13 +245,38 @@ export default function AdminDashboard() {
         setTournament(updatedTournaments[0]);
       }
       
-      setMessage(`✅ Tournament status changed to "${newStatus}" and saved to database!`);
+      setMessage(`✅ Tournament status changed to "${newStatus}" and saved to database! Manual override enabled.`);
       
     } catch (error) {
       setMessage('❌ Error changing tournament status. Please try again.');
       console.error('Error changing tournament status:', error);
     } finally {
       setIsResetting(false);
+    }
+  };
+
+  // Clear manual override and let auto-calculation take over
+  const clearManualOverride = async () => {
+    try {
+      const { getTournaments, updateTournament } = await import('@/lib/firebase-database');
+      const tournaments = await getTournaments();
+      
+      if (tournaments.length === 0) {
+        return;
+      }
+      
+      const tournament = tournaments[0];
+      const tournamentId = tournament.id || tournament.name?.toLowerCase().replace(/\s+/g, '-');
+      
+      // Clear manual override flags
+      await updateTournament(tournamentId, { 
+        manualStatusOverride: null,
+        forceStatus: null
+      });
+      console.log('✅ Manual override cleared - auto-calculation will now apply');
+      
+    } catch (error) {
+      console.error('Error clearing manual override:', error);
     }
   };
 
@@ -266,9 +297,13 @@ export default function AdminDashboard() {
       const tournament = tournaments[0];
       const tournamentId = tournament.id || tournament.name?.toLowerCase().replace(/\s+/g, '-');
       
-      // Update tournament status to closed
-      await updateTournament(tournamentId, { status: 'closed' });
-      console.log('✅ Tournament status updated to closed');
+      // Update tournament status to closed with manual override
+      await updateTournament(tournamentId, { 
+        status: 'closed',
+        manualStatusOverride: true,
+        forceStatus: true
+      });
+      console.log('✅ Tournament status updated to closed with manual override');
       
       // Get all matches for this tournament
       const matches = await getMatches(tournamentId);
@@ -300,7 +335,7 @@ export default function AdminDashboard() {
       setTournamentStatus('closed');
       setMatches(updatedMatches);
       
-      setMessage(`✅ Tournament registration closed! ${openMatches.length > 0 ? `Updated ${openMatches.length} matches to 'generated' status.` : 'No matches needed updating.'}`);
+      setMessage(`✅ Tournament registration closed! ${openMatches.length > 0 ? `Updated ${openMatches.length} matches to 'generated' status.` : 'No matches needed updating.'} Manual override enabled.`);
       
       // Refresh tournament data
       const updatedTournaments = await getTournaments();
@@ -1359,6 +1394,11 @@ const syncMatches = async () => {
                 <h3 className="text-lg font-semibold text-white mb-2">Tournament Status</h3>
                 <p className="text-xl font-semibold text-emerald-400 capitalize">{tournamentStatus}</p>
                 <p className="text-slate-300 text-sm">Registration Status</p>
+                {tournament?.manualStatusOverride && (
+                  <div className="mt-2 p-2 bg-amber-500/20 border border-amber-500/30 rounded">
+                    <p className="text-amber-400 text-xs">⚠️ Manual override active</p>
+                  </div>
+                )}
                 {tournamentStatus === 'open' && (
                   <button
                     onClick={closeTournamentRegistration}
@@ -1368,30 +1408,24 @@ const syncMatches = async () => {
                     {isResetting ? 'Closing...' : '🔒 Close Registration'}
                   </button>
                 )}
-              </div>
-
-              {/* Tournament Management */}
-              <div className="bg-white/10 backdrop-blur-md rounded-xl p-6 border border-white/20">
-                <h3 className="text-lg font-semibold text-white mb-4">🏆 Tournament Management</h3>
-                <div className="space-y-3">
-                  <div className="flex gap-3">
-                    <button
-                      onClick={() => changeTournamentStatus('open')}
-                      disabled={isResetting}
-                      className="px-4 py-2 bg-emerald-600/20 text-emerald-400 border border-emerald-600/30 rounded-lg font-medium hover:bg-emerald-600/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {isResetting ? 'Opening...' : '🔓 Make Open'}
-                    </button>
-                    <button
-                      onClick={() => changeTournamentStatus('closed')}
-                      disabled={isResetting}
-                      className="px-4 py-2 bg-red-600/20 text-red-400 border border-red-600/30 rounded-lg font-medium hover:bg-red-600/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {isResetting ? 'Closing...' : '🔒 Make Closed'}
-                    </button>
-                  </div>
-                  <p className="text-slate-300 text-sm">Manually control tournament registration status</p>
-                </div>
+                {tournamentStatus === 'closed' && (
+                  <button
+                    onClick={() => changeTournamentStatus('open')}
+                    disabled={isResetting}
+                    className="mt-3 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {isResetting ? 'Opening...' : '🔓 Open Registration'}
+                  </button>
+                )}
+                {tournament?.manualStatusOverride && (
+                  <button
+                    onClick={clearManualOverride}
+                    disabled={isResetting}
+                    className="mt-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
+                  >
+                    🔄 Clear Override (Auto-Calculate)
+                  </button>
+                )}
               </div>
 
               {/* Generate Matches Button */}
