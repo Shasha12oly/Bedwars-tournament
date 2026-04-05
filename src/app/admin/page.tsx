@@ -107,14 +107,17 @@ export default function AdminDashboard() {
       setMatches(uniqueMatches);
       
       // Update tournament status in database and clear manual override
-      const { updateDoc, doc } = await import('firebase/firestore');
+      const { updateDoc, doc, deleteField } = await import('firebase/firestore');
       const { db } = await import('@/lib/firebase');
       const tournamentRef = doc(db, 'tournaments', tournamentId);
       await updateDoc(tournamentRef, { 
         status: 'matches_generated',
         matchesGenerated: true,
-        manualStatusOverride: null,
-        forceStatus: null
+        manualStatusOverride: deleteField(),
+        forceStatus: deleteField(),
+        adminOverrideActive: deleteField(),
+        overrideTimestamp: deleteField(),
+        overrideReason: deleteField()
       });
       
       // Update local state
@@ -278,12 +281,13 @@ export default function AdminDashboard() {
       const tournamentId = tournament.id || tournament.name?.toLowerCase().replace(/\s+/g, '-');
       
       // Clear ALL manual override flags to restore automatic logic
+      const { deleteField } = await import('firebase/firestore');
       await updateTournament(tournamentId, { 
-        manualStatusOverride: null,
-        forceStatus: null,
-        adminOverrideActive: null,
-        overrideTimestamp: null,
-        overrideReason: null
+        manualStatusOverride: deleteField(),
+        forceStatus: deleteField(),
+        adminOverrideActive: deleteField(),
+        overrideTimestamp: deleteField(),
+        overrideReason: deleteField()
       });
       console.log('✅ ALL manual overrides cleared - automatic status calculation will now apply');
       
