@@ -44,3 +44,5 @@ data/tournaments.json
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+plugin/target/classes/com/bedwars/BedwarsTournament.class
+/plugin

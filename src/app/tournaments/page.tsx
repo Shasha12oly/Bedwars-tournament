@@ -81,8 +81,8 @@ export default function TournamentsPage() {
           // Check if tournament is completed (has winner)
           const isCompleted = !!tournament.winner;
           
-          // Check for manual override flags from admin
-          const hasManualOverride = tournament.manualStatusOverride || tournament.forceStatus;
+          // Check for manual override flags from admin (NEW enhanced check)
+          const hasManualOverride = tournament.manualStatusOverride || tournament.forceStatus || tournament.adminOverrideActive;
           
           // Determine correct status based on ACTUAL conditions (not stored status)
           let correctStatus: 'open' | 'closed' | 'matches_generated' | 'completed';
@@ -91,8 +91,16 @@ export default function TournamentsPage() {
             // Has winner = Completed (highest priority)
             correctStatus = 'completed';
           } else if (hasManualOverride) {
-            // Admin has manually set status - use stored status
+            // Admin has manually set status - use stored status and DO NOT correct it
             correctStatus = tournament.status as 'open' | 'closed' | 'matches_generated' | 'completed';
+            console.log(`🚨 Admin override active for ${tournament.name} - keeping status: ${correctStatus}`);
+            // Skip database update for admin overridden tournaments
+            return {
+              ...tournament,
+              status: correctStatus,
+              currentTeams: teamCount,
+              slots: tournament.maxSlots
+            } as unknown as Tournament;
           } else if (teamCount < 16) {
             // Less than 16 teams = Open for registration
             correctStatus = 'open';

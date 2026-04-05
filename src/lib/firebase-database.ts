@@ -73,6 +73,12 @@ export interface Tournament {
     members: string[];
   };
   completedAt?: string | Timestamp;
+  // Admin override fields
+  manualStatusOverride?: boolean;
+  forceStatus?: boolean;
+  adminOverrideActive?: boolean;
+  overrideTimestamp?: string | Timestamp;
+  overrideReason?: string;
 }
 
 // Collections

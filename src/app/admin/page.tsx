@@ -211,11 +211,11 @@ export default function AdminDashboard() {
     }
   };
 
-  // Change tournament status manually
+  // Change tournament status manually (ADMIN OVERRIDE - overrides ALL logic)
   const changeTournamentStatus = async (newStatus: 'open' | 'closed') => {
     try {
       setIsResetting(true);
-      setMessage(`🔄 Changing tournament status to ${newStatus}...`);
+      setMessage(`� ADMIN OVERRIDE: Changing tournament status to ${newStatus}...`);
       
       const { getTournaments, updateTournament } = await import('@/lib/firebase-database');
       const tournaments = await getTournaments();
@@ -228,24 +228,33 @@ export default function AdminDashboard() {
       const tournament = tournaments[0];
       const tournamentId = tournament.id || tournament.name?.toLowerCase().replace(/\s+/g, '-');
       
-      // Update tournament status in database with manual override flag
+      // Update tournament status in database with STRONG manual override flags
       await updateTournament(tournamentId, { 
         status: newStatus,
         manualStatusOverride: true,
-        forceStatus: true
+        forceStatus: true,
+        adminOverrideActive: true,
+        overrideTimestamp: new Date().toISOString(),
+        overrideReason: 'Admin manual override - forces status regardless of team count or other conditions'
       });
-      console.log(`✅ Tournament status updated to ${newStatus} with manual override`);
+      console.log(`🚨 ADMIN OVERRIDE: Tournament status FORCED to ${newStatus} - all automatic logic disabled`);
       
-      // Update local state
+      // Update local state immediately
       setTournamentStatus(newStatus);
       
-      // Refresh tournament data
+      // Refresh tournament data to confirm override is stored
       const updatedTournaments = await getTournaments();
       if (updatedTournaments.length > 0) {
         setTournament(updatedTournaments[0]);
+        console.log('✅ Tournament data refreshed with override confirmed:', {
+          status: updatedTournaments[0].status,
+          manualStatusOverride: updatedTournaments[0].manualStatusOverride,
+          forceStatus: updatedTournaments[0].forceStatus,
+          adminOverrideActive: updatedTournaments[0].adminOverrideActive
+        });
       }
       
-      setMessage(`✅ Tournament status changed to "${newStatus}" and saved to database! Manual override enabled.`);
+      setMessage(`🚨 ADMIN OVERRIDE COMPLETE! Registration status FORCED to "${newStatus}" and saved to database! All automatic logic is now overridden.`);
       
     } catch (error) {
       setMessage('❌ Error changing tournament status. Please try again.');
@@ -268,12 +277,24 @@ export default function AdminDashboard() {
       const tournament = tournaments[0];
       const tournamentId = tournament.id || tournament.name?.toLowerCase().replace(/\s+/g, '-');
       
-      // Clear manual override flags
+      // Clear ALL manual override flags to restore automatic logic
       await updateTournament(tournamentId, { 
         manualStatusOverride: null,
-        forceStatus: null
+        forceStatus: null,
+        adminOverrideActive: null,
+        overrideTimestamp: null,
+        overrideReason: null
       });
-      console.log('✅ Manual override cleared - auto-calculation will now apply');
+      console.log('✅ ALL manual overrides cleared - automatic status calculation will now apply');
+      
+      // Refresh tournament data to update the UI
+      const updatedTournaments = await getTournaments();
+      if (updatedTournaments.length > 0) {
+        setTournament(updatedTournaments[0]);
+        // Update local status based on actual conditions
+        const currentTeamCount = teams.length;
+        setTournamentStatus(currentTeamCount >= 16 ? 'closed' : 'open');
+      }
       
     } catch (error) {
       console.error('Error clearing manual override:', error);
@@ -1381,12 +1402,76 @@ const syncMatches = async () => {
           <section className="card-glass p-6 mb-8">
             <h2 className="text-xl font-semibold text-white mb-6">Admin Actions</h2>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
               {/* Team Registration Status */}
               <div className="bg-white/10 backdrop-blur-md rounded-xl p-6 border border-white/20">
                 <h3 className="text-lg font-semibold text-white mb-2">Team Registration</h3>
                 <p className="text-3xl font-bold text-emerald-400">{teamCount}/16</p>
                 <p className="text-slate-300 text-sm">Teams Registered</p>
+              </div>
+
+              {/* Registration Status Override */}
+              <div className={`bg-white/10 backdrop-blur-md rounded-xl p-6 border ${tournament?.adminOverrideActive ? 'border-red-500/50 bg-red-500/5' : 'border-white/20'}`}>
+                <h3 className="text-lg font-semibold text-white mb-2">🔧 Registration Status Override</h3>
+                <div className="space-y-3">
+                  {tournament?.adminOverrideActive && (
+                    <div className="p-3 bg-red-500/20 border border-red-500/50 rounded-lg animate-pulse">
+                      <p className="text-red-400 text-xs font-semibold mb-1">🚨 ADMIN OVERRIDE ACTIVE</p>
+                      <p className="text-slate-300 text-xs">All automatic logic is currently overridden!</p>
+                      {tournament.overrideTimestamp && (
+                        <p className="text-red-300 text-xs mt-1">Since: {new Date(tournament.overrideTimestamp).toLocaleString()}</p>
+                      )}
+                    </div>
+                  )}
+                  <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
+                    <p className="text-red-400 text-xs font-semibold mb-1">⚠️ ADMIN OVERRIDE</p>
+                    <p className="text-slate-300 text-xs">This button overrides ALL automatic logic and forces the registration status to change immediately.</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      const newStatus = tournamentStatus === 'open' ? 'closed' : 'open';
+                      if (confirm(`🚨 ADMIN OVERRIDE: Force registration status to "${newStatus}"? This will override all automatic logic and cannot be undone automatically.`)) {
+                        changeTournamentStatus(newStatus as 'open' | 'closed');
+                      }
+                    }}
+                    disabled={isResetting}
+                    className={`w-full px-4 py-3 ${tournamentStatus === 'open' ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'} text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-semibold border-2 ${tournament?.adminOverrideActive ? 'border-red-400 animate-pulse' : 'border-white/20'}`}
+                  >
+                    {isResetting ? '⏳ Updating...' : (
+                      <>
+                        🚨 Force Status: {tournamentStatus === 'open' ? '🔒 CLOSE Registration' : '🔓 OPEN Registration'}
+                      </>
+                    )}
+                  </button>
+                  {tournament?.manualStatusOverride && (
+                    <button
+                      onClick={() => {
+                        if (confirm('Clear manual override and restore automatic status calculation?')) {
+                          clearManualOverride();
+                        }
+                      }}
+                      disabled={isResetting}
+                      className="w-full px-3 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
+                    >
+                      🔄 Clear Override (Auto-Calculate)
+                    </button>
+                  )}
+                  <p className="text-slate-300 text-xs">Current: <span className="font-semibold capitalize">{tournamentStatus}</span></p>
+                  <button
+                    onClick={async () => {
+                      try {
+                        const response = await fetch('/api/tournament-status');
+                        const data = await response.json();
+                        alert(`Tournament Status Info:\n\nStatus: ${data.status}\nAdmin Override: ${data.adminOverrideActive ? 'ACTIVE' : 'Inactive'}\nManual Override: ${data.manualStatusOverride ? 'Yes' : 'No'}\nForce Status: ${data.forceStatus ? 'Yes' : 'No'}\n\n${data.message}`);
+                      } catch (error) {
+                        alert('Error fetching status info');
+                      }
+                    }}
+                    className="w-full px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+                  >
+                    📊 Check Status Details
+                  </button>
+                </div>
               </div>
 
               {/* Tournament Status */}
@@ -1405,7 +1490,7 @@ const syncMatches = async () => {
                     disabled={isResetting}
                     className="mt-3 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
-                    {isResetting ? 'Closing...' : '🔒 Close Registration'}
+                    {isResetting ? 'Closing...' : '� Close Registration'}
                   </button>
                 )}
                 {tournamentStatus === 'closed' && (
@@ -1415,15 +1500,6 @@ const syncMatches = async () => {
                     className="mt-3 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     {isResetting ? 'Opening...' : '🔓 Open Registration'}
-                  </button>
-                )}
-                {tournament?.manualStatusOverride && (
-                  <button
-                    onClick={clearManualOverride}
-                    disabled={isResetting}
-                    className="mt-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
-                  >
-                    🔄 Clear Override (Auto-Calculate)
                   </button>
                 )}
               </div>
