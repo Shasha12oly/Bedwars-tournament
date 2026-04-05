@@ -12,7 +12,8 @@ import {
   orderBy, 
   limit,
   Timestamp,
-  deleteField
+  deleteField,
+  FieldValue
 } from 'firebase/firestore';
 import { db } from './firebase';
 
@@ -74,11 +75,11 @@ export interface Tournament {
   };
   completedAt?: string | Timestamp;
   // Admin override fields
-  manualStatusOverride?: boolean;
-  forceStatus?: boolean;
-  adminOverrideActive?: boolean;
-  overrideTimestamp?: string | Timestamp;
-  overrideReason?: string;
+  manualStatusOverride?: boolean | FieldValue;
+  forceStatus?: boolean | FieldValue;
+  adminOverrideActive?: boolean | FieldValue;
+  overrideTimestamp?: string | Timestamp | FieldValue;
+  overrideReason?: string | FieldValue;
 }
 
 // Collections
